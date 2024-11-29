@@ -1,0 +1,30 @@
+spec:
+  inputs:
+---
+
+include:
+  test:
+    script:
+      - false
+
+job_1:
+  script:
+    - test_1
+    - test_2
+    - test_3
+  after_script:
+    - echo "after_script 1"
+    - echo "after_script 2"
+
+job_2:
+  script: test_2
+  before_script: |
+    before_script
+
+job_3:
+  script: |
+    find . -name "*.txt" -print0 | while read -d $'\0' file
+    do
+      export TEST="$TEST $file"
+    done
+

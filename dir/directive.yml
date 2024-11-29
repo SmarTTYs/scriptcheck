@@ -1,0 +1,28 @@
+literal_test:
+  image: test
+  # scriptcheck shell=test/shell
+  script: |
+    find . -name "*.txt" -print0 | while read -d $'\0' file
+    do
+      export TEST="$TEST $file"
+    done
+    
+    echo $[[ inputs.test ]]
+
+illegal_test:
+  # scriptcheck
+  illegal:
+    example: test
+    second: 2
+
+list_test:
+  image: test
+  script: &test
+    - echo "test1"
+    - echo "test2"
+
+.test:
+  # scriptcheck
+  script_whatever: |
+    echo "Hello from literal"
+

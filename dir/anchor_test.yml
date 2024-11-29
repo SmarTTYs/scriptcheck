@@ -1,0 +1,30 @@
+---
+.other: &test |
+  find . -name "*.txt.anchor" -print0 | while read -d $'\0' file
+  do
+  export TEST="$TEST_ANCHOR $file"
+  done
+...
+---
+.other: &test |
+  find . -name "*.txt.anchor" -print0 | while read -d $'\0' file
+  do
+  export TEST="$TEST_ANCHOR $file"
+  done
+
+.test-script: &example
+  *test
+
+*example :
+  script: "test"
+
+.simple-script: &list-script
+  - echo "Element 1"
+  - echo "Element 2"
+
+# some comment
+.anchor_test:
+  image: test
+  # todo: currently does not work...
+  # scriptcheck
+  script: [echo "0", *list-script]

@@ -1,0 +1,53 @@
+spec:
+  inputs:
+---
+
+include:
+  test:
+    inputs:
+      first: 10
+      second: 20
+      nested:
+        first: 1
+        second: 2
+        third: 3
+  test_2:
+    10
+
+job_1:
+  script:
+    - test_1
+    - test_2
+    - test_3
+  after_script:
+    - echo "after_script 1"
+    - |
+      echo "after_script 2"
+      echo "after_script 3"
+
+# scriptcheck shell=bash/1
+.test-script: &example-script
+  |
+  #!/bin/bash
+  find . -name "*.txt.anchor" -print0 | while read -d $'\0' file
+  do
+    export TEST="$TEST_ANCHOR $file"
+  done
+
+# some comment
+job_2:
+  script: *example-script
+  before_script: |
+    before_script
+
+# test 3
+job_3:
+  image: test
+  script: |
+    #!/bin/bash
+    find . -name "*.txt" -print0 | while read -d $'\0' file
+    do
+      export TEST="$TEST $file"
+    done
+    
+    echo $[[ inputs.test ]]

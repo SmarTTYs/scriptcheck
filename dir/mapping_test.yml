@@ -1,0 +1,32 @@
+test: test
+
+# scriptcheck
+.test_1: |
+  Direct handling
+
+.test-5:
+  d: ""
+
+.test_2:
+  # scriptcheck
+  nested: |
+    Nested with literal
+
+  # scriptcheck
+  list:
+    - echo "element 1"
+    - echo "element 2"
+
+# todo: in cases where you mark the literal we are unable
+#  to find the name as we currently do not traverse back
+# todo: we could implement a name finder allowing to traverse back
+#  which per default would just get a Mapping / MappingValue and then
+#  at a later stage supports finding the parent of a literal
+
+# scriptcheck
+.test_3: &anchor: | # scriptcheck
+     Literal with anchor
+
+# scriptcheck
+.test_4: > # scriptcheck
+   Literal with anchor
