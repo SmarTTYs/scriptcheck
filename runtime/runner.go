@@ -1,15 +1,17 @@
-package cmd
+package runtime
 
 import (
 	"log"
 	"scriptcheck/reader"
 )
 
-type fileWriter func([]reader.ScriptBlock) ([]string, error)
+const StdoutOutput = "stdout"
 
-func runForFiles(files []string, writer fileWriter) ([]string, error) {
+type FileWriter func(Options, []reader.ScriptBlock) ([]string, error)
+
+func RunForFiles(options Options, files []string, writer FileWriter) ([]string, error) {
 	var scriptFilesNames = make([]string, 0)
-	decoder := reader.NewDecoder(sharedOptions.pipelineType)
+	decoder := reader.NewDecoder(options.PipelineType)
 
 	for _, file := range files {
 		fileScripts, err := decoder.DecodeFile(file)
@@ -18,7 +20,7 @@ func runForFiles(files []string, writer fileWriter) ([]string, error) {
 			return nil, err
 		}
 
-		scriptFileNames, err := writer(fileScripts)
+		scriptFileNames, err := writer(options, fileScripts)
 		if err != nil {
 			log.Printf("Error while running: %s\n", err.Error())
 			return nil, err

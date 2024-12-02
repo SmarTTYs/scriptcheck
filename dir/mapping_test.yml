@@ -17,9 +17,7 @@ test: test
     - echo "element 1"
     - echo "element 2"
 
-# todo: in cases where you mark the literal we are unable
 #  to find the name as we currently do not traverse back
-# todo: we could implement a name finder allowing to traverse back
 #  which per default would just get a Mapping / MappingValue and then
 #  at a later stage supports finding the parent of a literal
 

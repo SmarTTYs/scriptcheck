@@ -17,6 +17,7 @@ illegal_test:
 
 list_test:
   image: test
+  # scriptcheck
   script: &test
     - echo "test1"
     - echo "test2"

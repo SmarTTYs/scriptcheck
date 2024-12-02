@@ -132,6 +132,8 @@ func readScriptFromNode(node ast.Node, anchorNodeMap map[string]ast.Node) string
 	switch vType := node.(type) {
 	case *ast.TagNode:
 		return readScriptFromNode(vType.Value, anchorNodeMap)
+	case *ast.AnchorNode:
+		return readScriptFromNode(vType.Value, anchorNodeMap)
 	case *ast.AliasNode:
 		aliasName := vType.Value.GetToken().Value
 		anchorValue, exists := anchorNodeMap[aliasName]
