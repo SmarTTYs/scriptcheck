@@ -1,4 +1,4 @@
-FROM alpine:3.20.3
+FROM koalaman/shellcheck-alpine:v0.10.0
 
 COPY scriptcheck /usr/local/bin/scriptcheck
 
