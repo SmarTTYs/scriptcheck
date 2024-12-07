@@ -6,7 +6,7 @@ import (
 	"scriptcheck/runtime"
 )
 
-func newExtractCommand(options runtime.Options) *cobra.Command {
+func newExtractCommand(options *runtime.Options) *cobra.Command {
 	var extractCommand = &cobra.Command{
 		Use:   "extract [pattern]",
 		Short: "Extract script blocks from pipeline yaml files",

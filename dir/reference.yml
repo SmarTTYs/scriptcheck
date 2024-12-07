@@ -1,0 +1,12 @@
+# some comment
+.setup:
+  test: |
+    TEST FROM REFERENCE
+    With some script imported from reference
+    Yeah seems to work
+
+# todo: does not work fully as expected
+job_2:
+  script: !reference [.setup, test]
+  before_script: |
+    before_script

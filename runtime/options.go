@@ -2,13 +2,17 @@ package runtime
 
 import "scriptcheck/reader"
 
+func NewOptions() *Options {
+	return &Options{}
+}
+
 type Options struct {
 	Shell      string
 	OutputFile string
 
 	PipelineType reader.PipelineType
-	Pattern      string
 	Debug        bool
+	Merge        bool
 
 	ShellCheckArgs []string
 

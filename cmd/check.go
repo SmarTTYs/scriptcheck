@@ -5,7 +5,7 @@ import (
 	"scriptcheck/runtime"
 )
 
-func newCheckCommand(options runtime.Options) *cobra.Command {
+func newCheckCommand(options *runtime.Options) *cobra.Command {
 	checkCmd := &cobra.Command{
 		Use:   "check [pattern]",
 		Short: "Run shellcheck against scripts in pipeline yml files",
@@ -16,9 +16,29 @@ func newCheckCommand(options runtime.Options) *cobra.Command {
 		},
 	}
 
-	checkCmd.Flags().StringVarP(&options.OutputFile, "output", "o", runtime.StdoutOutput, "output file to write into")
-	checkCmd.Flags().StringVarP(&options.Shell, "shell", "s", "sh", "Shell to pass to shellcheck")
-	checkCmd.Flags().StringArrayVarP(&options.ShellCheckArgs, "flags", "f", []string{}, "shellcheck arguments")
+	checkCmd.Flags().StringVarP(
+		&options.OutputFile,
+		"output",
+		"o",
+		runtime.StdoutOutput,
+		"output file to write into",
+	)
+
+	checkCmd.Flags().StringVarP(
+		&options.Shell,
+		"shell",
+		"s",
+		"sh",
+		"Shell to pass to shellcheck",
+	)
+
+	checkCmd.Flags().StringArrayVarP(
+		&options.ShellCheckArgs,
+		"flags",
+		"f",
+		[]string{},
+		"shellcheck arguments",
+	)
 
 	return checkCmd
 }

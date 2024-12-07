@@ -16,27 +16,25 @@ func Execute() {
 }
 
 func newRootCmd() *cobra.Command {
-	options := runtime.Options{}
+	options := runtime.NewOptions()
 	cmd := &cobra.Command{
 		Use:   "scriptcheck",
 		Short: "Simple utility cli for working with pipeline scripts",
 		Long:  "CLI allowing to check or extract inlined pipeline scripts",
 	}
 
-	cmd.PersistentFlags().StringVarP(
-		&options.Pattern,
-		"pattern",
-		"p",
-		"*.yml",
-		"Filenames to extract script blocks from",
+	cmd.PersistentFlags().BoolVar(
+		&options.Debug,
+		"verbose",
+		false,
+		"Verbose output",
 	)
 
-	cmd.PersistentFlags().BoolVarP(
-		&options.Debug,
-		"debug",
-		"d",
+	cmd.PersistentFlags().BoolVar(
+		&options.Merge,
+		"merge",
 		false,
-		"Test",
+		"Whether to merge all input files into one file",
 	)
 
 	typeOptions := []reader.PipelineType{reader.PipelineTypeGitlab}

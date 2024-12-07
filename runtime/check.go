@@ -10,9 +10,9 @@ import (
 	"strings"
 )
 
-func CheckScripts(options Options, files []string) error {
+func CheckScripts(options *Options, files []string) error {
 	log.Printf("Checking scripts from [%d] files...\n", len(files))
-	if scriptFilesNames, err := RunForFiles(options, files, writeTempFiles); err != nil {
+	if scriptFilesNames, err := extractScriptsFromFiles(options, files, writeTempFiles); err != nil {
 		os.Exit(1)
 	} else {
 		if len(scriptFilesNames) == 0 {
@@ -34,7 +34,7 @@ func CheckScripts(options Options, files []string) error {
 	return nil
 }
 
-func runShellcheck(options Options, fileNames []string) error {
+func runShellcheck(options *Options, fileNames []string) error {
 	cmd := exec.Command("shellcheck", fileNames...)
 	cmd.Dir, _ = os.Getwd()
 	cmd.Args = append(cmd.Args, "--shell", options.Shell)
@@ -63,7 +63,7 @@ func runShellcheck(options Options, fileNames []string) error {
 	return cmd.Run()
 }
 
-func writeTempFiles(_ Options, scripts []reader.ScriptBlock) ([]string, error) {
+func writeTempFiles(_ *Options, scripts []reader.ScriptBlock) ([]string, error) {
 	tempDir, err := os.MkdirTemp("", "scripts")
 	if err != nil {
 		return nil, fmt.Errorf("failed to create temp dir: %s", err.Error())
@@ -81,6 +81,7 @@ func writeTempFiles(_ Options, scripts []reader.ScriptBlock) ([]string, error) {
 	return fileNames, nil
 }
 
+// todo: improve the dir / file names
 func createTempFile(tempDir string, script reader.ScriptBlock) (*os.File, error) {
 	transformedFileName := strings.ReplaceAll(script.GetOutputFileName(""), "/", "")
 	tempF, err := os.CreateTemp(tempDir, fmt.Sprintf("script-%s", transformedFileName))

@@ -25,6 +25,5 @@
 # some comment
 .anchor_test:
   image: test
-  # todo: currently does not work...
   # scriptcheck
   script: [echo "0", *list-script]

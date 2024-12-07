@@ -2,7 +2,9 @@ package reader
 
 import (
 	"fmt"
+	"github.com/goccy/go-yaml"
 	"github.com/goccy/go-yaml/ast"
+	"log"
 	"regexp"
 	"slices"
 	"strings"
@@ -21,11 +23,12 @@ var sections = []string{
 	"after_script",
 }
 
-func newGitlabDecoder() ScriptDecoder {
+func newGitlabDecoder(debug bool) ScriptDecoder {
 	decoder := ScriptDecoder{
 		gitlabScriptReader{
 			anchorNodeMap: make(DocumentAnchorMap),
 		},
+		debug,
 		readScriptFromNode,
 		replaceJobInputReference,
 	}
@@ -47,7 +50,10 @@ func (r gitlabScriptReader) readScriptsForAst(file *ast.File) ([]ScriptBlock, er
 	}
 
 	// special support for anchor types
+	// todo: empty document crashes
+	println(documentToRead.Type().String())
 	for _, n := range ast.Filter(ast.AnchorType, documentToRead) {
+		println("Test...", n.Type())
 		anchor := n.(*ast.AnchorNode)
 		anchorName := anchor.Name.GetToken().Value
 		r.anchorNodeMap[anchorName] = anchor.Value
@@ -57,8 +63,14 @@ func (r gitlabScriptReader) readScriptsForAst(file *ast.File) ([]ScriptBlock, er
 	return r.readFromDocument(file.Name, documentToRead)
 }
 
+var document *ast.DocumentNode
+
 func (r gitlabScriptReader) readFromDocument(fileName string, doc *ast.DocumentNode) ([]ScriptBlock, error) {
 	documentScripts := make([]ScriptBlock, 0)
+
+	// todo: test
+	document = doc
+
 	switch body := doc.Body.(type) {
 	case *ast.MappingNode:
 		for _, vNode := range body.Values {
@@ -131,7 +143,13 @@ func replaceJobInputReference(script string) string {
 func readScriptFromNode(node ast.Node, anchorNodeMap map[string]ast.Node) string {
 	switch vType := node.(type) {
 	case *ast.TagNode:
-		return readScriptFromNode(vType.Value, anchorNodeMap)
+		if vType.Start.Value == "!reference" {
+			script := readScriptFromReference(vType, anchorNodeMap)
+			return script
+		} else {
+			log.Println("Unknown reference type")
+			return ""
+		}
 	case *ast.AnchorNode:
 		return readScriptFromNode(vType.Value, anchorNodeMap)
 	case *ast.AliasNode:
@@ -156,4 +174,25 @@ func readScriptFromNode(node ast.Node, anchorNodeMap map[string]ast.Node) string
 	default:
 		return ""
 	}
+}
+
+func pathFromSequence(node *ast.SequenceNode) *yaml.Path {
+	pathBuilder := (&yaml.PathBuilder{}).Root()
+	for _, pathValue := range node.Values {
+		pathBuilder.Child(pathValue.String())
+	}
+
+	return pathBuilder.Build()
+}
+
+func readScriptFromReference(tag *ast.TagNode, anchorNodeMap map[string]ast.Node) string {
+	pathValues := tag.Value.(*ast.SequenceNode)
+	pathString := pathFromSequence(pathValues)
+
+	pathNode, err := pathString.FilterNode(document.Body)
+	if err != nil {
+		return ""
+	}
+
+	return readScriptFromNode(pathNode, anchorNodeMap)
 }

@@ -10,6 +10,7 @@ func NewScriptCheckDirectiveReader(decoder ScriptDecoder) ScriptDecoder {
 			parser:      decoder.parser,
 			transformer: decoder.transformer,
 		},
+		decoder.debug,
 		decoder.parser,
 		decoder.transformer,
 	}

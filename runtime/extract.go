@@ -8,9 +8,9 @@ import (
 	"strings"
 )
 
-func ExtractScripts(options Options, files []string) error {
+func ExtractScripts(options *Options, files []string) error {
 	log.Printf("Extracting scripts from %d files...\n", len(files))
-	if scripts, err := RunForFiles(options, files, writeFiles); err != nil {
+	if scripts, err := extractScriptsFromFiles(options, files, writeFiles); err != nil {
 		log.Printf("Error extracting scripts: %v\n", err)
 		return err
 	} else {
@@ -24,7 +24,7 @@ func ExtractScripts(options Options, files []string) error {
 	}
 }
 
-func writeFiles(options Options, scripts []reader.ScriptBlock) ([]string, error) {
+func writeFiles(options *Options, scripts []reader.ScriptBlock) ([]string, error) {
 	err := os.MkdirAll(options.OutputDirectory, os.ModePerm)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create temp dir: %s", err.Error())
@@ -42,7 +42,7 @@ func writeFiles(options Options, scripts []reader.ScriptBlock) ([]string, error)
 	return fileNames, nil
 }
 
-func createAndWriteFile(options Options, script reader.ScriptBlock, directory string) (*os.File, error) {
+func createAndWriteFile(options *Options, script reader.ScriptBlock, directory string) (*os.File, error) {
 	fileName := script.GetOutputFileName(directory)
 	tempF, err := os.Create(fileName)
 	if err != nil {
