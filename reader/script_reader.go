@@ -18,14 +18,14 @@ const (
 func NewDecoder(pipelineType PipelineType, debug bool) ScriptDecoder {
 	switch pipelineType {
 	case PipelineTypeGitlab:
-		return newGitlabDecoder(debug)
+		return NewGitlabDecoder(debug)
 	}
 
 	panic(fmt.Sprintf("unknown pipeline type: %s", pipelineType))
 }
 
 type DocumentAnchorMap map[string]ast.Node
-type ScriptParser func(node ast.Node, anchorMap map[string]ast.Node) string
+type ScriptParser func(document *ast.DocumentNode, node ast.Node, anchorMap map[string]ast.Node) string
 type ScriptTransformer func(script string) string
 
 type ScriptReader interface {
@@ -35,9 +35,9 @@ type ScriptReader interface {
 type ScriptDecoder struct {
 	ScriptReader
 
-	debug       bool
-	parser      ScriptParser
-	transformer ScriptTransformer
+	Debug       bool
+	Parser      ScriptParser
+	Transformer ScriptTransformer
 }
 
 type ScriptBlock struct {
@@ -68,13 +68,13 @@ func (d ScriptDecoder) MergeAndDecode(files []string) ([]ScriptBlock, error) {
 func (d ScriptDecoder) decodeAstFile(astFile *ast.File) ([]ScriptBlock, error) {
 	scriptBlocks := make([]ScriptBlock, 0)
 	readerScripts, err := d.readScriptsForAst(astFile)
-	if d.debug {
+	if d.Debug {
 		log.Printf("Extracted %d script(s) from file '%s'\n", len(readerScripts), astFile.Name)
 	}
 
-	directiveDecoder := NewScriptCheckDirectiveReader(d)
+	directiveDecoder := newScriptCheckDirectiveDecoder(d)
 	directiveScripts, err := directiveDecoder.readScriptsForAst(astFile)
-	if d.debug {
+	if d.Debug {
 		log.Printf("Extracted %d script(s) from directives for file '%s'\n", len(readerScripts), astFile.Name)
 	}
 
@@ -88,10 +88,17 @@ func (d ScriptDecoder) decodeAstFile(astFile *ast.File) ([]ScriptBlock, error) {
 	return scriptBlocks, nil
 }
 
-func (script ScriptBlock) GetOutputFileName(parentDir string) string {
-	nameWithoutExtension := script.FileName[:len(script.FileName)-len(filepath.Ext(script.FileName))]
-	transformedFileName := strings.ReplaceAll(nameWithoutExtension, string(filepath.Separator), "-")
-	return parentDir + "/" + transformedFileName + "-" + script.BlockName + ".sh"
+func (script ScriptBlock) GetOutputFilePath(parentDir string) string {
+	sBuilder := new(strings.Builder)
+	extension := filepath.Ext(script.FileName)
+	sBuilder.WriteString(parentDir)
+	sBuilder.WriteRune(filepath.Separator)
+	sBuilder.WriteString(script.FileName[:len(script.FileName)-len(extension)])
+	sBuilder.WriteRune('-')
+	sBuilder.WriteString(script.BlockName)
+	sBuilder.WriteString(".sh")
+
+	return sBuilder.String()
 }
 
 func readFile(file string) (*ast.File, error) {

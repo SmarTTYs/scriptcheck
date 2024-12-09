@@ -4,15 +4,15 @@ import (
 	"github.com/goccy/go-yaml/ast"
 )
 
-func NewScriptCheckDirectiveReader(decoder ScriptDecoder) ScriptDecoder {
+func newScriptCheckDirectiveDecoder(decoder ScriptDecoder) ScriptDecoder {
 	return ScriptDecoder{
-		&scriptcheckDirectiveReader{
-			parser:      decoder.parser,
-			transformer: decoder.transformer,
+		ScriptReader: &scriptcheckDirectiveReader{
+			parser:      decoder.Parser,
+			transformer: decoder.Transformer,
 		},
-		decoder.debug,
-		decoder.parser,
-		decoder.transformer,
+		Debug:       decoder.Debug,
+		Parser:      decoder.Parser,
+		Transformer: decoder.Transformer,
 	}
 }
 
@@ -26,7 +26,11 @@ type scriptcheckDirectiveReader struct {
 
 type scriptCheckDirectiveVisitor struct {
 	ast.Visitor
-	file    *ast.File
+	file *ast.File
+
+	// currently looped document
+	document *ast.DocumentNode
+
 	Scripts []ScriptBlock
 
 	parser        ScriptParser
@@ -35,7 +39,7 @@ type scriptCheckDirectiveVisitor struct {
 }
 
 func (r *scriptcheckDirectiveReader) readScriptsForAst(file *ast.File) ([]ScriptBlock, error) {
-	walker := &scriptCheckDirectiveVisitor{
+	directiveWalker := &scriptCheckDirectiveVisitor{
 		file:          file,
 		parser:        r.parser,
 		transformer:   r.transformer,
@@ -43,15 +47,18 @@ func (r *scriptcheckDirectiveReader) readScriptsForAst(file *ast.File) ([]Script
 	}
 
 	for _, doc := range file.Docs {
-		for _, n := range ast.Filter(ast.AnchorType, doc) {
-			anchor := n.(*ast.AnchorNode)
-			anchorName := anchor.Name.GetToken().Value
-			walker.anchorNodeMap[anchorName] = anchor.Value
+		if doc.Body != nil {
+			directiveWalker.document = doc
+			for _, n := range ast.Filter(ast.AnchorType, doc) {
+				anchor := n.(*ast.AnchorNode)
+				anchorName := anchor.Name.GetToken().Value
+				directiveWalker.anchorNodeMap[anchorName] = anchor.Value
+			}
+			ast.Walk(directiveWalker, doc)
 		}
-		ast.Walk(walker, doc)
 	}
 
-	return walker.Scripts, nil
+	return directiveWalker.Scripts, nil
 }
 
 func (v *scriptCheckDirectiveVisitor) Visit(node ast.Node) ast.Visitor {
@@ -60,11 +67,11 @@ func (v *scriptCheckDirectiveVisitor) Visit(node ast.Node) ast.Visitor {
 		return v
 	}
 
-	if directive := scriptDirectiveFromComment(node.GetComment()); directive != nil {
+	if directive := ScriptDirectiveFromComment(node.GetComment()); directive != nil {
 		mappingValueNode := node.(*ast.MappingValueNode)
 		name := mappingValueNode.Key.String()
 
-		if script := readScriptFromNode(mappingValueNode.Value, v.anchorNodeMap); len(script) > 0 {
+		if script := v.parser(v.document, mappingValueNode.Value, v.anchorNodeMap); len(script) > 0 {
 			script = v.transformer(script)
 			scriptBlock := ScriptBlock{
 				FileName:  v.file.Name,

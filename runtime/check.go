@@ -81,10 +81,11 @@ func writeTempFiles(_ *Options, scripts []reader.ScriptBlock) ([]string, error) 
 	return fileNames, nil
 }
 
-// todo: improve the dir / file names
 func createTempFile(tempDir string, script reader.ScriptBlock) (*os.File, error) {
-	transformedFileName := strings.ReplaceAll(script.GetOutputFileName(""), "/", "")
-	tempF, err := os.CreateTemp(tempDir, fmt.Sprintf("script-%s", transformedFileName))
+	filePath := script.GetOutputFilePath("")
+	transformedFileName := strings.ReplaceAll(filePath, "/", "")
+	filePattern := fmt.Sprintf("script-*-%s", transformedFileName)
+	tempF, err := os.CreateTemp(tempDir, filePattern)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create temp file: %s", err.Error())
 	}

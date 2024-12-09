@@ -12,6 +12,7 @@ import (
 
 // jobs names prefixed with a dot get ignored by gitlab ci
 const gitlabJobIgnoreMarker = "."
+const gitlabReferenceTag = "!reference"
 
 // regular expression to find gitlab input references
 var jobInputRegex = regexp.MustCompile("\\$\\[\\[(\\s*inputs[^]]+)]]")
@@ -23,14 +24,14 @@ var sections = []string{
 	"after_script",
 }
 
-func newGitlabDecoder(debug bool) ScriptDecoder {
+func NewGitlabDecoder(debug bool) ScriptDecoder {
 	decoder := ScriptDecoder{
-		gitlabScriptReader{
+		ScriptReader: gitlabScriptReader{
 			anchorNodeMap: make(DocumentAnchorMap),
 		},
-		debug,
-		readScriptFromNode,
-		replaceJobInputReference,
+		Debug:       debug,
+		Parser:      readScriptFromNode,
+		Transformer: replaceJobInputReference,
 	}
 
 	return decoder
@@ -38,40 +39,35 @@ func newGitlabDecoder(debug bool) ScriptDecoder {
 
 type gitlabScriptReader struct {
 	ScriptReader
+	// currently looped document
+	document      *ast.DocumentNode
 	anchorNodeMap DocumentAnchorMap
 }
 
 func (r gitlabScriptReader) readScriptsForAst(file *ast.File) ([]ScriptBlock, error) {
-	var documentToRead *ast.DocumentNode
 	if len(file.Docs) > 1 {
-		documentToRead = file.Docs[1]
+		r.document = file.Docs[1]
 	} else {
-		documentToRead = file.Docs[0]
+		r.document = file.Docs[0]
 	}
 
-	// special support for anchor types
-	// todo: empty document crashes
-	println(documentToRead.Type().String())
-	for _, n := range ast.Filter(ast.AnchorType, documentToRead) {
-		println("Test...", n.Type())
-		anchor := n.(*ast.AnchorNode)
-		anchorName := anchor.Name.GetToken().Value
-		r.anchorNodeMap[anchorName] = anchor.Value
+	// otherwise the current filter walker fails as body
+	// will be null for empty yaml files
+	if r.document.Body != nil {
+		for _, n := range ast.Filter(ast.AnchorType, r.document) {
+			anchor := n.(*ast.AnchorNode)
+			anchorName := anchor.Name.GetToken().Value
+			r.anchorNodeMap[anchorName] = anchor.Value
+		}
 	}
 
 	// read script blocks from given document
-	return r.readFromDocument(file.Name, documentToRead)
+	return r.readFromDocument(file.Name)
 }
 
-var document *ast.DocumentNode
-
-func (r gitlabScriptReader) readFromDocument(fileName string, doc *ast.DocumentNode) ([]ScriptBlock, error) {
+func (r gitlabScriptReader) readFromDocument(fileName string) ([]ScriptBlock, error) {
 	documentScripts := make([]ScriptBlock, 0)
-
-	// todo: test
-	document = doc
-
-	switch body := doc.Body.(type) {
+	switch body := r.document.Body.(type) {
 	case *ast.MappingNode:
 		for _, vNode := range body.Values {
 			if scripts := r.readScriptsFromMappingNode(fileName, vNode); scripts != nil {
@@ -107,7 +103,7 @@ func (r gitlabScriptReader) readScriptsFromJob(file, jobName string, node *ast.M
 		eKey := element.Key.String()
 		eValue := element.Value
 		if slices.Contains(sections, eKey) {
-			script := readScriptFromNode(eValue, r.anchorNodeMap)
+			script := readScriptFromNode(r.document, eValue, r.anchorNodeMap)
 			script = replaceJobInputReference(script)
 
 			scriptBlock := ScriptBlock{
@@ -116,7 +112,7 @@ func (r gitlabScriptReader) readScriptsFromJob(file, jobName string, node *ast.M
 				Script:    script,
 			}
 
-			if directive := scriptDirectiveFromComment(element.GetComment()); directive != nil {
+			if directive := ScriptDirectiveFromComment(element.GetComment()); directive != nil {
 				scriptBlock.Shell = directive.ShellDirective()
 			}
 
@@ -140,18 +136,18 @@ func replaceJobInputReference(script string) string {
 	return script
 }
 
-func readScriptFromNode(node ast.Node, anchorNodeMap map[string]ast.Node) string {
+func readScriptFromNode(document *ast.DocumentNode, node ast.Node, anchorNodeMap map[string]ast.Node) string {
 	switch vType := node.(type) {
 	case *ast.TagNode:
-		if vType.Start.Value == "!reference" {
-			script := readScriptFromReference(vType, anchorNodeMap)
+		if vType.Start.Value == gitlabReferenceTag {
+			script := readScriptFromReference(document, vType, anchorNodeMap)
 			return script
 		} else {
 			log.Println("Unknown reference type")
 			return ""
 		}
 	case *ast.AnchorNode:
-		return readScriptFromNode(vType.Value, anchorNodeMap)
+		return readScriptFromNode(document, vType.Value, anchorNodeMap)
 	case *ast.AliasNode:
 		aliasName := vType.Value.GetToken().Value
 		anchorValue, exists := anchorNodeMap[aliasName]
@@ -159,7 +155,7 @@ func readScriptFromNode(node ast.Node, anchorNodeMap map[string]ast.Node) string
 			panic(fmt.Sprintf("anchor %s not found!", aliasName))
 		}
 
-		return readScriptFromNode(anchorValue, anchorNodeMap)
+		return readScriptFromNode(document, anchorValue, anchorNodeMap)
 	case *ast.StringNode:
 		return vType.Value
 	case *ast.LiteralNode:
@@ -167,7 +163,7 @@ func readScriptFromNode(node ast.Node, anchorNodeMap map[string]ast.Node) string
 	case *ast.SequenceNode:
 		sb := new(strings.Builder)
 		for _, listElement := range vType.Values {
-			sb.WriteString(readScriptFromNode(listElement, anchorNodeMap))
+			sb.WriteString(readScriptFromNode(document, listElement, anchorNodeMap))
 			sb.WriteString("\n")
 		}
 		return sb.String()
@@ -185,7 +181,7 @@ func pathFromSequence(node *ast.SequenceNode) *yaml.Path {
 	return pathBuilder.Build()
 }
 
-func readScriptFromReference(tag *ast.TagNode, anchorNodeMap map[string]ast.Node) string {
+func readScriptFromReference(document *ast.DocumentNode, tag *ast.TagNode, anchorNodeMap map[string]ast.Node) string {
 	pathValues := tag.Value.(*ast.SequenceNode)
 	pathString := pathFromSequence(pathValues)
 
@@ -194,5 +190,5 @@ func readScriptFromReference(tag *ast.TagNode, anchorNodeMap map[string]ast.Node
 		return ""
 	}
 
-	return readScriptFromNode(pathNode, anchorNodeMap)
+	return readScriptFromNode(document, pathNode, anchorNodeMap)
 }

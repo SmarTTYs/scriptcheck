@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"scriptcheck/reader"
 	"strings"
 )
@@ -43,10 +44,17 @@ func writeFiles(options *Options, scripts []reader.ScriptBlock) ([]string, error
 }
 
 func createAndWriteFile(options *Options, script reader.ScriptBlock, directory string) (*os.File, error) {
-	fileName := script.GetOutputFileName(directory)
-	tempF, err := os.Create(fileName)
+	filePath := script.GetOutputFilePath(directory)
+
+	// create nested directories
+	err := os.MkdirAll(filepath.Dir(filePath), os.ModePerm)
 	if err != nil {
-		return nil, fmt.Errorf("unable to create temp file: %s", err.Error())
+		return nil, err
+	}
+
+	tempF, err := os.Create(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("unable to create file: %s", err.Error())
 	}
 
 	if !strings.HasPrefix(script.Script, "#!") {

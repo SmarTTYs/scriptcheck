@@ -7,9 +7,9 @@ import (
 
 const scriptCheckPrefix = "scriptcheck"
 
-type scriptDirective map[string]string
+type ScriptDirective map[string]string
 
-func scriptDirectiveFromString(dataString string) scriptDirective {
+func scriptDirectiveFromString(dataString string) ScriptDirective {
 	data := strings.TrimPrefix(dataString, scriptCheckPrefix)
 	data = strings.TrimSpace(data)
 	markerParts := strings.Split(data, " ")
@@ -27,11 +27,11 @@ func scriptDirectiveFromString(dataString string) scriptDirective {
 	return directives
 }
 
-func (d scriptDirective) ShellDirective() string {
+func (d ScriptDirective) ShellDirective() string {
 	return d["shell"]
 }
 
-func scriptDirectiveFromComment(comment *ast.CommentGroupNode) *scriptDirective {
+func ScriptDirectiveFromComment(comment *ast.CommentGroupNode) *ScriptDirective {
 	if marker := findScriptCheckMarker(comment); marker != nil {
 		directive := scriptDirectiveFromString(*marker)
 		return &directive
