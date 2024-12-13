@@ -14,7 +14,12 @@ import (
 	"strings"
 )
 
-func CheckScripts(options *Options, files []string) error {
+func CheckScripts(options *Options, fileNames []string) error {
+	files, err := collectFiles(fileNames)
+	if err != nil {
+		return err
+	}
+
 	log.Printf("Checking scripts from [%d] files...\n", len(files))
 	if scriptFilesNames, err := extractScriptsFromFiles(options, files); err != nil {
 		os.Exit(1)

@@ -1,6 +1,7 @@
 package runtime
 
 import (
+	"github.com/bmatcuk/doublestar/v4"
 	"log"
 	"scriptcheck/reader"
 )
@@ -32,4 +33,17 @@ func extractScriptsFromFiles(options *Options, files []string) ([]reader.ScriptB
 	}
 
 	return scripts, nil
+}
+
+func collectFiles(globPatterns []string) ([]string, error) {
+	files := make([]string, 0)
+	for _, pattern := range globPatterns {
+		globFiles, err := doublestar.FilepathGlob(pattern)
+		if err != nil {
+			return nil, err
+		}
+		files = append(files, globFiles...)
+	}
+
+	return files, nil
 }

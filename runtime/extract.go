@@ -8,7 +8,12 @@ import (
 	"scriptcheck/reader"
 )
 
-func ExtractScripts(options *Options, files []string) error {
+func ExtractScripts(options *Options, fileNames []string) error {
+	files, err := collectFiles(fileNames)
+	if err != nil {
+		return err
+	}
+
 	log.Printf("Extracting scripts from %d files...\n", len(files))
 	if scripts, err := extractScriptsFromFiles(options, files); err != nil {
 		log.Printf("Error extracting scripts: %v\n", err)
