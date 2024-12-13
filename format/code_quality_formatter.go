@@ -37,7 +37,7 @@ func (f *CodeQualityReportFormatter) Format(report ShellCheckReport, scriptMap m
 		codeClimateReport.Description = report.Message
 		codeClimateReport.CheckName = strconv.Itoa(report.Code)
 		codeClimateReport.Fingerprint = uuid.New().String()
-		codeClimateReport.Location.Path = scriptBlock.FileName + "#" + scriptBlock.Path
+		codeClimateReport.Location.Path = scriptBlock.FileName
 		codeClimateReport.Location.Lines.Begin = scriptBlock.StartPos + report.Line - offset
 		codeClimateReport.Severity = severityFromShellcheck(report.Level)
 
