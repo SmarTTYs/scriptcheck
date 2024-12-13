@@ -1,6 +1,9 @@
 package runtime
 
-import "scriptcheck/reader"
+import (
+	"scriptcheck/format"
+	"scriptcheck/reader"
+)
 
 func NewOptions() *Options {
 	return &Options{}
@@ -15,6 +18,7 @@ type Options struct {
 	Merge        bool
 
 	ShellCheckArgs []string
+	Format         format.Format
 
 	OutputDirectory string
 }

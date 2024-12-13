@@ -9,7 +9,7 @@ const StdoutOutput = "stdout"
 
 type FileWriter func(*Options, []reader.ScriptBlock) ([]string, error)
 
-func extractScriptsFromFiles(options *Options, files []string, writer FileWriter) ([]string, error) {
+func extractScriptsFromFiles(options *Options, files []string) ([]reader.ScriptBlock, error) {
 	decoder := reader.NewDecoder(options.PipelineType, options.Debug)
 	scripts := make([]reader.ScriptBlock, 0)
 
@@ -31,5 +31,5 @@ func extractScriptsFromFiles(options *Options, files []string, writer FileWriter
 		}
 	}
 
-	return writer(options, scripts)
+	return scripts, nil
 }

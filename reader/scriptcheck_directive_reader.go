@@ -2,6 +2,7 @@ package reader
 
 import (
 	"github.com/goccy/go-yaml/ast"
+	"strings"
 )
 
 func newScriptCheckDirectiveDecoder(decoder ScriptDecoder) ScriptDecoder {
@@ -73,11 +74,14 @@ func (v *scriptCheckDirectiveVisitor) Visit(node ast.Node) ast.Visitor {
 
 		if script := v.parser(v.document, mappingValueNode.Value, v.anchorNodeMap); len(script) > 0 {
 			script = v.transformer(script)
+			hasShell := strings.HasPrefix(script, "#!")
 			scriptBlock := ScriptBlock{
 				FileName:  v.file.Name,
 				BlockName: "directive-" + name,
 				Script:    script,
 				Shell:     directive.ShellDirective(),
+				HasShell:  hasShell,
+				Path:      mappingValueNode.Value.GetPath(),
 			}
 			v.Scripts = append(v.Scripts, scriptBlock)
 		}

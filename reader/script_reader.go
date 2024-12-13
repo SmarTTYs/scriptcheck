@@ -40,11 +40,29 @@ type ScriptDecoder struct {
 	Transformer ScriptTransformer
 }
 
+func NewScriptBlock(file, key, jobName, script string, node ast.Node) ScriptBlock {
+	hasShell := strings.HasPrefix(script, "#!")
+	return ScriptBlock{
+		FileName:  file,
+		BlockName: jobName + "_" + key,
+		Script:    script,
+		Path:      node.GetPath(),
+
+		HasShell: hasShell,
+
+		StartPos: node.GetToken().Position.Line,
+	}
+}
+
 type ScriptBlock struct {
 	FileName  string
 	BlockName string
 	Script    string
 	Shell     string
+	Path      string
+
+	HasShell bool
+	StartPos int
 }
 
 func (d ScriptDecoder) DecodeFile(file string) ([]ScriptBlock, error) {

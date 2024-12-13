@@ -23,6 +23,7 @@ job_2:
 
 job_3:
   script: |
+    #!/bin/sh
     find . -name "*.txt" -print0 | while read -d $'\0' file
     do
       export TEST="$TEST $file"

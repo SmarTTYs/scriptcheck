@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"github.com/spf13/cobra"
+	"scriptcheck/format"
 	"scriptcheck/runtime"
 )
 
@@ -34,10 +35,21 @@ func newCheckCommand(options *runtime.Options) *cobra.Command {
 
 	checkCmd.Flags().StringArrayVarP(
 		&options.ShellCheckArgs,
-		"flags",
-		"f",
+		"args",
+		"a",
 		[]string{},
 		"shellcheck arguments",
+	)
+
+	formatOptions := []format.Format{format.StandardFormat, format.CodeQualityFormat}
+	enumVarP(
+		checkCmd.PersistentFlags(),
+		formatOptions,
+		&options.Format,
+		format.StandardFormat,
+		"format",
+		"f",
+		"Format in which you want to print shellcheck results",
 	)
 
 	return checkCmd

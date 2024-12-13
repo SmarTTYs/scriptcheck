@@ -6,15 +6,19 @@ import (
 	"os"
 	"path/filepath"
 	"scriptcheck/reader"
-	"strings"
 )
 
 func ExtractScripts(options *Options, files []string) error {
 	log.Printf("Extracting scripts from %d files...\n", len(files))
-	if scripts, err := extractScriptsFromFiles(options, files, writeFiles); err != nil {
+	if scripts, err := extractScriptsFromFiles(options, files); err != nil {
 		log.Printf("Error extracting scripts: %v\n", err)
 		return err
 	} else {
+		_, err = writeFiles(options, scripts)
+		if err != nil {
+			return err
+		}
+
 		log.Printf(
 			"Successfully extracted %d scripts and saved into '%s' directory!",
 			len(scripts),
@@ -57,21 +61,10 @@ func createAndWriteFile(options *Options, script reader.ScriptBlock, directory s
 		return nil, fmt.Errorf("unable to create file: %s", err.Error())
 	}
 
-	if !strings.HasPrefix(script.Script, "#!") {
-		var scriptShell string
-		if len(script.Shell) > 0 {
-			scriptShell = script.Shell
-		} else {
-			scriptShell = options.Shell
-		}
-
-		if _, err := tempF.WriteString(fmt.Sprintf("# shellcheck shell=%s\n", scriptShell)); err != nil {
-			return nil, fmt.Errorf("unable to write to temp file: %s", err.Error())
-		}
-	}
-
-	if _, err = tempF.WriteString(script.Script); err != nil {
-		return nil, fmt.Errorf("unable to write to temp file: %s", err.Error())
+	// write into file
+	err = writeScriptBlock(tempF, options, script)
+	if err != nil {
+		return nil, err
 	}
 
 	return tempF, nil

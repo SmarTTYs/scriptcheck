@@ -106,11 +106,13 @@ func (r gitlabScriptReader) readScriptsFromJob(file, jobName string, node *ast.M
 			script := readScriptFromNode(r.document, eValue, r.anchorNodeMap)
 			script = replaceJobInputReference(script)
 
-			scriptBlock := ScriptBlock{
-				FileName:  file,
-				BlockName: jobName + "_" + eKey,
-				Script:    script,
-			}
+			scriptBlock := NewScriptBlock(
+				file,
+				eKey,
+				jobName,
+				script,
+				eValue,
+			)
 
 			if directive := ScriptDirectiveFromComment(element.GetComment()); directive != nil {
 				scriptBlock.Shell = directive.ShellDirective()
