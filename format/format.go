@@ -14,12 +14,12 @@ const (
 )
 
 type ShellCheckReportFormatter interface {
-	Format(report []byte, scriptMap map[string]reader.ScriptBlock) (string, error)
+	Format(report ShellCheckReport, scriptMap map[string]reader.ScriptBlock) (string, error)
 }
 
-type shellCheckReport []reportEntry
+type ShellCheckReport []ReportEntry
 
-type reportEntry struct {
+type ReportEntry struct {
 	File      string `json:"file"`
 	Line      int    `json:"line"`
 	EndLine   int    `json:"endLine"`
@@ -30,8 +30,8 @@ type reportEntry struct {
 	Message   string `json:"message"`
 }
 
-func shellCheckReportFromString(bytes []byte) (shellCheckReport, error) {
-	var report shellCheckReport
+func ShellCheckReportFromString(bytes []byte) (ShellCheckReport, error) {
+	var report ShellCheckReport
 	err := json.Unmarshal(bytes, &report)
 
 	if err != nil {
@@ -41,19 +41,10 @@ func shellCheckReportFromString(bytes []byte) (shellCheckReport, error) {
 	return report, nil
 }
 
-type StandardReportFormatter struct{}
-
-func (f *StandardReportFormatter) Format(reportString []byte, _ map[string]reader.ScriptBlock) (string, error) {
-	return string(reportString), nil
-}
-
 func NewFormatter(format Format) ShellCheckReportFormatter {
 	switch format {
 	case CodeQualityFormat:
 		return &CodeQualityReportFormatter{}
-	case StandardFormat:
-		return &StandardReportFormatter{}
 	}
-
 	panic("")
 }

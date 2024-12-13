@@ -9,28 +9,23 @@ import (
 
 type CodeQualityReportFormatter struct{}
 
-type codeClimateLocation struct {
-	Path  string           `json:"path"`
-	Lines codeClimateLines `json:"lines"`
-}
-
-type codeClimateLines struct {
-	Begin int `json:"begin"`
-}
-
 type codeClimateReport struct {
-	Description string              `json:"description"`
-	CheckName   string              `json:"check_name"`
-	Fingerprint string              `json:"fingerprint"`
-	Severity    string              `json:"severity"`
-	Location    codeClimateLocation `json:"location"`
+	Description string `json:"description"`
+	CheckName   string `json:"check_name"`
+	Fingerprint string `json:"fingerprint"`
+	Severity    string `json:"severity"`
+	Location    struct {
+		Path  string `json:"path"`
+		Lines struct {
+			Begin int `json:"begin"`
+		} `json:"lines"`
+	} `json:"location"`
 }
 
-func (f *CodeQualityReportFormatter) Format(reportString []byte, scriptMap map[string]reader.ScriptBlock) (string, error) {
-	report, _ := shellCheckReportFromString(reportString)
-	reports := make([]codeClimateReport, 0)
-	for _, issue := range report {
-		scriptBlock := scriptMap[issue.File]
+func (f *CodeQualityReportFormatter) Format(report ShellCheckReport, scriptMap map[string]reader.ScriptBlock) (string, error) {
+	codeClimateReports := make([]codeClimateReport, 0)
+	for _, report := range report {
+		scriptBlock := scriptMap[report.File]
 		var offset int
 		if scriptBlock.HasShell {
 			offset = 0
@@ -38,21 +33,32 @@ func (f *CodeQualityReportFormatter) Format(reportString []byte, scriptMap map[s
 			offset = 1
 		}
 
-		report := codeClimateReport{
-			Description: issue.Message,
-			CheckName:   strconv.Itoa(issue.Code),
-			Fingerprint: uuid.New().String(),
-			Location: codeClimateLocation{
-				Path: scriptBlock.FileName + "#" + scriptBlock.Path,
-				Lines: codeClimateLines{
-					Begin: scriptBlock.StartPos + issue.Line - offset,
-				},
-			},
-		}
+		codeClimateReport := codeClimateReport{}
+		codeClimateReport.Description = report.Message
+		codeClimateReport.CheckName = strconv.Itoa(report.Code)
+		codeClimateReport.Fingerprint = uuid.New().String()
+		codeClimateReport.Location.Path = scriptBlock.FileName + "#" + scriptBlock.Path
+		codeClimateReport.Location.Lines.Begin = scriptBlock.StartPos + report.Line - offset
+		codeClimateReport.Severity = severityFromShellcheck(report.Level)
 
-		reports = append(reports, report)
+		codeClimateReports = append(codeClimateReports, codeClimateReport)
 	}
 
-	marshal, err := json.Marshal(reports)
+	marshal, err := json.Marshal(codeClimateReports)
 	return string(marshal), err
+}
+
+func severityFromShellcheck(shellCheckSeverity string) string {
+	switch shellCheckSeverity {
+	case "error":
+		return "major"
+	case "warning":
+		return "minor"
+	case "info":
+		return "info"
+	case "style":
+		return "minor"
+	default:
+		return "critical"
+	}
 }
