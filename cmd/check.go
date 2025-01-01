@@ -41,7 +41,7 @@ func newCheckCommand(options *runtime.Options) *cobra.Command {
 		"shellcheck arguments",
 	)
 
-	formatOptions := []format.Format{format.StandardFormat, format.CodeQualityFormat}
+	formatOptions := []format.Format{format.StandardFormat, format.CodeQualityFormat, format.JsonFormat}
 	enumVarP(
 		checkCmd.PersistentFlags(),
 		formatOptions,

@@ -3,8 +3,6 @@ package format
 import (
 	"encoding/json"
 	"github.com/google/uuid"
-	"scriptcheck/reader"
-	"strconv"
 )
 
 type CodeQualityReportFormatter struct{}
@@ -22,23 +20,15 @@ type codeClimateReport struct {
 	} `json:"location"`
 }
 
-func (f *CodeQualityReportFormatter) Format(report ShellCheckReport, scriptMap map[string]reader.ScriptBlock) (string, error) {
+func (f *CodeQualityReportFormatter) Format(reports []ScriptCheckReport) (string, error) {
 	codeClimateReports := make([]codeClimateReport, 0)
-	for _, report := range report {
-		scriptBlock := scriptMap[report.File]
-		var offset int
-		if scriptBlock.HasShell {
-			offset = 0
-		} else {
-			offset = 1
-		}
-
+	for _, report := range reports {
 		codeClimateReport := codeClimateReport{}
 		codeClimateReport.Description = report.Message
-		codeClimateReport.CheckName = strconv.Itoa(report.Code)
+		codeClimateReport.CheckName = report.Reason
 		codeClimateReport.Fingerprint = uuid.New().String()
-		codeClimateReport.Location.Path = scriptBlock.FileName
-		codeClimateReport.Location.Lines.Begin = scriptBlock.StartPos + report.Line - offset
+		codeClimateReport.Location.Path = report.File
+		codeClimateReport.Location.Lines.Begin = report.Line
 		codeClimateReport.Severity = severityFromShellcheck(report.Level)
 
 		codeClimateReports = append(codeClimateReports, codeClimateReport)
