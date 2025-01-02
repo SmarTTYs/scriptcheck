@@ -29,8 +29,11 @@ type ScriptCheckReport struct {
 	Line int `json:"line"`
 
 	// column where the violation was found
-	Column    int `json:"column"`
-	EndColumn int `json:"endColumn"`
+	// currently ignored for json format as we
+	// do not support 100% correct columns in
+	// the checked yaml file
+	Column    int `json:"-"`
+	EndColumn int `json:"-"`
 
 	// shellcheck reason (code prefixed by SC)
 	Reason string `json:"reason"`
@@ -83,13 +86,16 @@ func newScriptCheckReport(reports []shellcheckReport, scriptMap map[string]reade
 		}
 
 		reason := "SC" + strconv.Itoa(report.Code)
+		// the report starts at 1 so we need to subtract one in order
+		// to get the correct line inside the yaml file
+		reportLineBase := report.Line - 1
 		scriptReport := ScriptCheckReport{
 			File:    scriptBlock.FileName,
 			report:  report,
 			Level:   report.Level,
 			Message: report.Message,
 
-			Line:      scriptBlock.StartPos + report.Line - offset,
+			Line:      scriptBlock.StartPos + reportLineBase - offset,
 			Column:    report.Column,
 			EndColumn: report.EndColumn,
 

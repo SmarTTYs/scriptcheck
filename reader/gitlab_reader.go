@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/goccy/go-yaml"
 	"github.com/goccy/go-yaml/ast"
+	"github.com/goccy/go-yaml/token"
 	"log"
 	"regexp"
 	"slices"
@@ -138,6 +139,17 @@ func replaceJobInputReference(script string) string {
 	return script
 }
 
+func readPositionFromNode(node ast.Node) *token.Position {
+	switch vType := node.(type) {
+	case *ast.StringNode:
+		return node.GetToken().Position
+	case *ast.LiteralNode:
+		return readPositionFromNode(vType.Value)
+	default:
+		return node.GetToken().Position
+	}
+}
+
 func readScriptFromNode(document *ast.DocumentNode, node ast.Node, anchorNodeMap map[string]ast.Node) string {
 	switch vType := node.(type) {
 	case *ast.TagNode:
@@ -152,12 +164,11 @@ func readScriptFromNode(document *ast.DocumentNode, node ast.Node, anchorNodeMap
 		return readScriptFromNode(document, vType.Value, anchorNodeMap)
 	case *ast.AliasNode:
 		aliasName := vType.Value.GetToken().Value
-		anchorValue, exists := anchorNodeMap[aliasName]
-		if !exists {
+		if anchorValue, exists := anchorNodeMap[aliasName]; !exists {
 			panic(fmt.Sprintf("anchor %s not found!", aliasName))
+		} else {
+			return readScriptFromNode(document, anchorValue, anchorNodeMap)
 		}
-
-		return readScriptFromNode(document, anchorValue, anchorNodeMap)
 	case *ast.StringNode:
 		return vType.Value
 	case *ast.LiteralNode:

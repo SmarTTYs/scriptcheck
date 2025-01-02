@@ -25,19 +25,21 @@ func (f *PrettyFormatter) Format(reports []ScriptCheckReport) (string, error) {
 
 	for file, reports := range fileReports {
 		for line, lineReports := range reports {
-			f.appendReportNew(builder, file, line, lineReports)
+			f.appendGroupedReport(builder, file, line, lineReports)
 		}
 	}
-	builder.WriteString("\n TEST CURRENT \n")
 
-	for _, report := range reports {
-		f.appendReport(builder, report)
-	}
+	/*
+		builder.WriteString("\n TEST CURRENT \n")
+		for _, report := range reports {
+			f.appendReport(builder, report)
+		}
+	*/
 
 	return builder.String(), nil
 }
 
-func (f *PrettyFormatter) appendReportNew(builder *strings.Builder, file string, line int, reports []ScriptCheckReport) {
+func (f *PrettyFormatter) appendGroupedReport(builder *strings.Builder, file string, line int, reports []ScriptCheckReport) {
 	builder.WriteString(Color(fmt.Sprintf("In %s line %d:", file, line), Bold))
 	builder.WriteString("\n")
 	builder.WriteString(f.getLine(reports[0]) + "\n")
@@ -45,7 +47,10 @@ func (f *PrettyFormatter) appendReportNew(builder *strings.Builder, file string,
 	informationList := make([]string, 0)
 	for _, report := range reports {
 		builder.WriteString(f.formatReportLine(report))
-		informationList = append(informationList, fmt.Sprintf("https://www.shellcheck.net/wiki/%s -- %s", report.Reason, report.Message))
+		informationList = append(
+			informationList,
+			fmt.Sprintf("https://www.shellcheck.net/wiki/%s -- %s", report.Reason, report.Message),
+		)
 	}
 
 	builder.WriteString("For more information:\n")
@@ -54,6 +59,7 @@ func (f *PrettyFormatter) appendReportNew(builder *strings.Builder, file string,
 	}
 }
 
+/*
 func (f *PrettyFormatter) appendReport(builder *strings.Builder, report ScriptCheckReport) {
 	builder.WriteString(Color(fmt.Sprintf("In %s line %d", report.File, report.Line), Bold))
 	builder.WriteString("\n")
@@ -61,6 +67,7 @@ func (f *PrettyFormatter) appendReport(builder *strings.Builder, report ScriptCh
 	builder.WriteString(f.formatReportLine(report))
 	builder.WriteString("\n")
 }
+*/
 
 func (f *PrettyFormatter) formatReportLine(report ScriptCheckReport) string {
 	color := f.getLevelColor(report.Level)

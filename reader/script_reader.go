@@ -42,6 +42,7 @@ type ScriptDecoder struct {
 
 func NewScriptBlock(file, key, jobName, script string, node ast.Node) ScriptBlock {
 	hasShell := strings.HasPrefix(script, "#!")
+	position := readPositionFromNode(node)
 	return ScriptBlock{
 		FileName:  file,
 		BlockName: jobName + "_" + key,
@@ -50,7 +51,8 @@ func NewScriptBlock(file, key, jobName, script string, node ast.Node) ScriptBloc
 
 		HasShell: hasShell,
 
-		StartPos: node.GetToken().Position.Line,
+		// Column:   position.Column,
+		StartPos: position.Line,
 	}
 }
 
@@ -62,6 +64,9 @@ type ScriptBlock struct {
 	Path      string
 
 	HasShell bool
+
+	// todo: currently does not work as expected
+	// Column   int
 	StartPos int
 }
 
