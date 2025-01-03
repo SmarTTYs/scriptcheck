@@ -102,7 +102,7 @@ func (f *PrettyFormatter) getLevelColor(level string) string {
 }
 
 func (*PrettyFormatter) getLine(report ScriptCheckReport) string {
-	lineScanner := bufio.NewScanner(strings.NewReader(report.script.Script))
+	lineScanner := bufio.NewScanner(strings.NewReader(report.script.ScriptString()))
 	line := 0
 	for lineScanner.Scan() {
 		line++

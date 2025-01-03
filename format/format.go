@@ -79,7 +79,7 @@ func newScriptCheckReport(reports []shellcheckReport, scriptMap map[string]reade
 	for _, report := range reports {
 		scriptBlock := scriptMap[report.File]
 		var offset int
-		if scriptBlock.HasShell {
+		if scriptBlock.Script.HasShell() {
 			offset = 0
 		} else {
 			offset = 1

@@ -161,7 +161,7 @@ func createTempFile(options *Options, tempDir string, script reader.ScriptBlock)
 
 func writeScriptBlock(file *os.File, options *Options, script reader.ScriptBlock) error {
 	// ensure every script starts either with a script or shellcheck directive
-	if !script.HasShell {
+	if !script.Script.HasShell() {
 		var scriptShell string
 		if len(script.Shell) > 0 {
 			scriptShell = script.Shell
@@ -174,7 +174,7 @@ func writeScriptBlock(file *os.File, options *Options, script reader.ScriptBlock
 		}
 	}
 
-	if _, err := file.WriteString(script.Script); err != nil {
+	if _, err := file.WriteString(script.ScriptString()); err != nil {
 		return fmt.Errorf("unable to write to file: %s", err.Error())
 	}
 

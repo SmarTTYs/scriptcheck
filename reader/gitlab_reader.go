@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/goccy/go-yaml"
 	"github.com/goccy/go-yaml/ast"
-	"github.com/goccy/go-yaml/token"
 	"log"
 	"regexp"
 	"slices"
@@ -139,14 +138,12 @@ func replaceJobInputReference(script string) string {
 	return script
 }
 
-func readPositionFromNode(node ast.Node) *token.Position {
+func readLineFromNode(node ast.Node) int {
 	switch vType := node.(type) {
-	case *ast.StringNode:
-		return node.GetToken().Position
 	case *ast.LiteralNode:
-		return readPositionFromNode(vType.Value)
+		return vType.GetToken().Position.Line + 1
 	default:
-		return node.GetToken().Position
+		return node.GetToken().Position.Line
 	}
 }
 
