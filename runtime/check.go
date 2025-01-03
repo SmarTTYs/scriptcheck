@@ -21,14 +21,14 @@ func CheckScripts(options *Options, fileNames []string) error {
 	}
 
 	log.Printf("Checking scripts from [%d] files...\n", len(files))
-	if scriptFilesNames, err := extractScriptsFromFiles(options, files); err != nil {
+	if scripts, err := extractScriptsFromFiles(options, files); err != nil {
 		os.Exit(1)
 	} else {
-		if len(scriptFilesNames) == 0 {
+		if len(scripts) == 0 {
 			os.Exit(0)
 		}
 
-		tempDir, fileScriptBlockMap, err := writeTempFiles(options, scriptFilesNames)
+		tempDir, fileScriptBlockMap, err := writeTempFiles(options, scripts)
 		if err != nil {
 			return err
 		}
@@ -53,49 +53,49 @@ func CheckScripts(options *Options, fileNames []string) error {
 }
 
 func runShellcheck(options *Options, fileNames []string, scriptMap map[string]reader.ScriptBlock) error {
-	var outB bytes.Buffer
+	report, err := executeShellCheck(scriptMap, options, fileNames)
+	if err != nil {
+		return fmt.Errorf("unable to parse shellcheck report: %w", err)
+	}
+
+	formatter := format.NewFormatter(options.Format)
+	reportString, err := formatter.Format(report)
+	if err != nil {
+		return fmt.Errorf("unable to format shellcheck report: %w", err)
+	}
+
+	if writeErr := writeReport(options, reportString); writeErr != nil {
+		return writeErr
+	}
+
+	return nil
+}
+
+func executeShellCheck(scriptMap map[string]reader.ScriptBlock, options *Options, fileNames []string) ([]format.ScriptCheckReport, error) {
+	out := new(bytes.Buffer)
 	cmd := exec.Command("shellcheck", fileNames...)
 	cmd.Dir, _ = os.Getwd()
 	cmd.Args = append(cmd.Args, "--shell", options.Shell)
 	cmd.Stderr = os.Stderr
-	cmd.Stdout = &outB
+	cmd.Stdout = out
 
 	// append provided shell args
 	for _, arg := range options.ShellCheckArgs {
 		cmd.Args = append(cmd.Args, "--"+arg)
 	}
 
-	if options.Format != format.StandardFormat {
-		cmd.Args = append(cmd.Args, "--format", "json")
-	}
+	// always force json format in order to parse it afterward
+	cmd.Args = append(cmd.Args, "--format", "json")
 
 	if errors.Is(cmd.Err, exec.ErrDot) {
 		cmd.Err = nil
 	}
 
-	executionErr := cmd.Run()
-
-	var reportString string
-	if options.Format != format.StandardFormat {
-		formatter := format.NewFormatter(options.Format)
-		report, err := format.ShellCheckReportFromString(outB.Bytes())
-		if err != nil {
-			return fmt.Errorf("unable to parse shellcheck report: %w", err)
-		}
-		reportString, err = formatter.Format(report, scriptMap)
-		if err != nil {
-			return fmt.Errorf("unable to format shellcheck report: %w", err)
-		}
+	if runErr := cmd.Run(); runErr != nil {
+		return format.NewScriptCheckReport(out.Bytes(), scriptMap)
 	} else {
-		reportString = outB.String()
+		return nil, runErr
 	}
-
-	err := writeReport(options, reportString)
-	if err != nil {
-		return err
-	}
-
-	return executionErr
 }
 
 func writeReport(options *Options, report string) error {
@@ -160,7 +160,8 @@ func createTempFile(options *Options, tempDir string, script reader.ScriptBlock)
 }
 
 func writeScriptBlock(file *os.File, options *Options, script reader.ScriptBlock) error {
-	if !strings.HasPrefix(script.Script, "#!") {
+	// ensure every script starts either with a script or shellcheck directive
+	if !script.Script.HasShell() {
 		var scriptShell string
 		if len(script.Shell) > 0 {
 			scriptShell = script.Shell
@@ -173,7 +174,7 @@ func writeScriptBlock(file *os.File, options *Options, script reader.ScriptBlock
 		}
 	}
 
-	if _, err := file.WriteString(script.Script); err != nil {
+	if _, err := file.WriteString(script.ScriptString()); err != nil {
 		return fmt.Errorf("unable to write to file: %s", err.Error())
 	}
 

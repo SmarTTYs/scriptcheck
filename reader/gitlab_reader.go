@@ -138,6 +138,15 @@ func replaceJobInputReference(script string) string {
 	return script
 }
 
+func readLineFromNode(node ast.Node) int {
+	switch vType := node.(type) {
+	case *ast.LiteralNode:
+		return vType.GetToken().Position.Line + 1
+	default:
+		return node.GetToken().Position.Line
+	}
+}
+
 func readScriptFromNode(document *ast.DocumentNode, node ast.Node, anchorNodeMap map[string]ast.Node) string {
 	switch vType := node.(type) {
 	case *ast.TagNode:
@@ -152,12 +161,11 @@ func readScriptFromNode(document *ast.DocumentNode, node ast.Node, anchorNodeMap
 		return readScriptFromNode(document, vType.Value, anchorNodeMap)
 	case *ast.AliasNode:
 		aliasName := vType.Value.GetToken().Value
-		anchorValue, exists := anchorNodeMap[aliasName]
-		if !exists {
+		if anchorValue, exists := anchorNodeMap[aliasName]; !exists {
 			panic(fmt.Sprintf("anchor %s not found!", aliasName))
+		} else {
+			return readScriptFromNode(document, anchorValue, anchorNodeMap)
 		}
-
-		return readScriptFromNode(document, anchorValue, anchorNodeMap)
 	case *ast.StringNode:
 		return vType.Value
 	case *ast.LiteralNode:
