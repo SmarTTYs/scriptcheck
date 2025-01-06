@@ -1,14 +1,33 @@
 package runtime
 
 import (
+	"fmt"
 	"github.com/bmatcuk/doublestar/v4"
 	"log"
+	"scriptcheck/format"
 	"scriptcheck/reader"
 )
 
 const StdoutOutput = "stdout"
 
-type FileWriter func(*Options, []reader.ScriptBlock) ([]string, error)
+func collectAndExtractScripts(options *Options, fileNames []string) ([]reader.ScriptBlock, []string, error) {
+	files, err := collectFiles(fileNames)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	log.Printf("Reading %s file(s)...\n", format.Color(len(files), format.Bold))
+	if scripts, err := extractScriptsFromFiles(options, files); err != nil {
+		log.Printf("Error extracting scripts: %v\n", err)
+		return nil, nil, fmt.Errorf("unable to extract files: %w", err)
+	} else {
+		if len(scripts) == 0 && options.Strict {
+			return nil, nil, fmt.Errorf("no scripts found in %s", format.Color(len(files), format.Bold))
+		}
+
+		return scripts, files, nil
+	}
+}
 
 func extractScriptsFromFiles(options *Options, files []string) ([]reader.ScriptBlock, error) {
 	decoder := reader.NewDecoder(options.PipelineType, options.Debug)
