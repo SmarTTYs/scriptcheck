@@ -14,48 +14,65 @@ import (
 	"strings"
 )
 
+func removeIntermediateScripts(path string) {
+	log.Printf("Removing intermediate directory %s", path)
+	_ = os.RemoveAll(path)
+}
+
 func CheckScripts(options *Options, fileNames []string) error {
-	files, err := collectFiles(fileNames)
+	scripts, files, err := collectAndExtractScripts(options, fileNames)
 	if err != nil {
 		return err
 	}
 
-	log.Printf("Checking scripts from [%d] files...\n", len(files))
-	if scripts, err := extractScriptsFromFiles(options, files); err != nil {
-		os.Exit(1)
-	} else {
-		if len(scripts) == 0 {
-			os.Exit(0)
-		}
+	log.Printf(
+		"Checking %s script(s) from %s file(s)...\n",
+		format.Color(len(scripts), format.Bold),
+		format.Color(len(files), format.Bold),
+	)
 
-		tempDir, fileScriptBlockMap, err := writeTempFiles(options, scripts)
-		if err != nil {
-			return err
-		}
-		fileNames := slices.Collect(maps.Keys(fileScriptBlockMap))
-
-		err = runShellcheck(options, fileNames, fileScriptBlockMap)
-		_ = os.RemoveAll(*tempDir)
-
-		if err != nil {
-			var exitError *exec.ExitError
-			if errors.As(err, &exitError) {
-				log.Println("Found shellcheck issues, exiting...")
-				os.Exit(exitError.ExitCode())
-			} else {
-				log.Println("There was an error checking your files...")
-				os.Exit(2)
-			}
-		}
+	tempDir, fileScriptBlockMap, err := writeTempFiles(options, scripts)
+	if err != nil {
+		return err
 	}
+
+	defer removeIntermediateScripts(*tempDir)
+
+	fileNames = slices.Collect(maps.Keys(fileScriptBlockMap))
+	err = runShellcheck(options, fileNames, fileScriptBlockMap)
+	if err != nil {
+		return err
+	}
+
 	log.Printf("Successfully checked files!")
 	return nil
+}
+
+var (
+	ErrorStrictValidation = errors.New("strict validation failed")
+	scriptCheckError      = ScriptCheckError{}
+)
+
+type ScriptCheckError struct {
+	Reports []format.ScriptCheckReport
+}
+
+func (_ ScriptCheckError) Is(_ error) bool {
+	return true
+}
+
+func (e ScriptCheckError) Error() string {
+	return fmt.Sprintf("Found %d issues", len(e.Reports))
 }
 
 func runShellcheck(options *Options, fileNames []string, scriptMap map[string]reader.ScriptBlock) error {
 	report, err := executeShellCheck(scriptMap, options, fileNames)
 	if err != nil {
 		return fmt.Errorf("unable to parse shellcheck report: %w", err)
+	}
+
+	if len(report) == 0 {
+		return nil
 	}
 
 	formatter := format.NewFormatter(options.Format)
@@ -68,7 +85,7 @@ func runShellcheck(options *Options, fileNames []string, scriptMap map[string]re
 		return writeErr
 	}
 
-	return nil
+	return &ScriptCheckError{report}
 }
 
 func executeShellCheck(scriptMap map[string]reader.ScriptBlock, options *Options, fileNames []string) ([]format.ScriptCheckReport, error) {
@@ -92,9 +109,14 @@ func executeShellCheck(scriptMap map[string]reader.ScriptBlock, options *Options
 	}
 
 	if runErr := cmd.Run(); runErr != nil {
+		var exitError *exec.ExitError
+		if errors.As(runErr, &exitError) && exitError.ExitCode() == 2 {
+			return nil, runErr
+		}
 		return format.NewScriptCheckReport(out.Bytes(), scriptMap)
 	} else {
-		return nil, runErr
+		// nothing to do in this case
+		return nil, nil
 	}
 }
 

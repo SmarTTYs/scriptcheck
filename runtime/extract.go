@@ -5,33 +5,34 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"scriptcheck/format"
 	"scriptcheck/reader"
 )
 
 func ExtractScripts(options *Options, fileNames []string) error {
-	files, err := collectFiles(fileNames)
+	scripts, files, err := collectAndExtractScripts(options, fileNames)
 	if err != nil {
 		return err
 	}
 
-	log.Printf("Extracting scripts from %d files...\n", len(files))
-	if scripts, err := extractScriptsFromFiles(options, files); err != nil {
-		log.Printf("Error extracting scripts: %v\n", err)
+	log.Printf(
+		"Extracting %s script(s) from %s file(s)...\n",
+		format.Color(len(scripts), format.Bold),
+		format.Color(len(files), format.Bold),
+	)
+
+	err = writeFiles(options, scripts)
+	if err != nil {
 		return err
-	} else {
-		err = writeFiles(options, scripts)
-		if err != nil {
-			return err
-		}
-
-		log.Printf(
-			"Successfully extracted %d scripts and saved into '%s' directory!",
-			len(scripts),
-			options.OutputDirectory,
-		)
-
-		return nil
 	}
+
+	log.Printf(
+		"Successfully extracted %s scripts and saved into %s directory!",
+		format.Color(len(scripts), format.Bold),
+		format.Color(options.OutputDirectory, format.Bold),
+	)
+
+	return nil
 }
 
 func writeFiles(options *Options, scripts []reader.ScriptBlock) error {

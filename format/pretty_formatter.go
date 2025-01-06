@@ -55,7 +55,7 @@ func (f *PrettyFormatter) appendGroupedReport(builder *strings.Builder, file str
 
 	builder.WriteString("For more information:\n")
 	for _, line := range informationList {
-		builder.WriteString(" " + line + "\n")
+		builder.WriteString(" " + line + "\n\n")
 	}
 }
 

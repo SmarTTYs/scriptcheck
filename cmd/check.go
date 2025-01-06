@@ -1,7 +1,10 @@
 package cmd
 
 import (
+	"errors"
 	"github.com/spf13/cobra"
+	"log"
+	"os"
 	"scriptcheck/format"
 	"scriptcheck/runtime"
 )
@@ -13,7 +16,24 @@ func newCheckCommand(options *runtime.Options) *cobra.Command {
 		Long:  "Run shellcheck against scripts in pipeline yml files",
 		Args:  cobra.MinimumNArgs(1),
 		Run: func(cmd *cobra.Command, files []string) {
-			_ = runtime.CheckScripts(options, files)
+			if err := runtime.CheckScripts(options, files); err != nil {
+				var scriptCheckError *runtime.ScriptCheckError
+				/*
+					if errors.As(err, &exitError) {
+							os.Exit(exitError.ExitCode())
+						}
+				*/
+				if errors.As(err, &scriptCheckError) {
+					log.Printf(
+						"Found %s issues, exiting...",
+						format.Color(len(scriptCheckError.Reports), format.Bold),
+					)
+					os.Exit(1)
+				} else {
+					log.Println("There was an error checking your files...")
+					os.Exit(2)
+				}
+			}
 		},
 	}
 
