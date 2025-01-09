@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"maps"
 	"os"
@@ -11,7 +12,6 @@ import (
 	"scriptcheck/format"
 	"scriptcheck/reader"
 	"slices"
-	"strings"
 )
 
 func removeIntermediateScripts(path string) {
@@ -19,8 +19,8 @@ func removeIntermediateScripts(path string) {
 	_ = os.RemoveAll(path)
 }
 
-func CheckScripts(options *Options, fileNames []string) error {
-	scripts, files, err := collectAndExtractScripts(options, fileNames)
+func CheckFiles(options *Options, globPatterns []string) error {
+	scripts, files, err := collectAndExtractScripts(options, globPatterns)
 	if err != nil {
 		return err
 	}
@@ -31,6 +31,10 @@ func CheckScripts(options *Options, fileNames []string) error {
 		format.Color(len(files), format.Bold),
 	)
 
+	return checkScripts(options, scripts)
+}
+
+func checkScripts(options *Options, scripts []reader.ScriptBlock) error {
 	tempDir, fileScriptBlockMap, err := writeTempFiles(options, scripts)
 	if err != nil {
 		return err
@@ -38,7 +42,7 @@ func CheckScripts(options *Options, fileNames []string) error {
 
 	defer removeIntermediateScripts(*tempDir)
 
-	fileNames = slices.Collect(maps.Keys(fileScriptBlockMap))
+	fileNames := slices.Collect(maps.Keys(fileScriptBlockMap))
 	err = runShellcheck(options, fileNames, fileScriptBlockMap)
 	if err != nil {
 		return err
@@ -48,25 +52,20 @@ func CheckScripts(options *Options, fileNames []string) error {
 	return nil
 }
 
-var (
-	ErrorStrictValidation = errors.New("strict validation failed")
-	scriptCheckError      = ScriptCheckError{}
-)
-
 type ScriptCheckError struct {
-	Reports []format.ScriptCheckReport
+	reports []format.ScriptCheckReport
 }
 
-func (_ ScriptCheckError) Is(_ error) bool {
-	return true
+func (e ScriptCheckError) ReportCount() int {
+	return len(e.reports)
 }
 
 func (e ScriptCheckError) Error() string {
-	return fmt.Sprintf("Found %d issues", len(e.Reports))
+	return fmt.Sprintf("Found %d issues", len(e.reports))
 }
 
 func runShellcheck(options *Options, fileNames []string, scriptMap map[string]reader.ScriptBlock) error {
-	report, err := executeShellCheck(scriptMap, options, fileNames)
+	report, err := executeShellCheckCommand(scriptMap, options, fileNames)
 	if err != nil {
 		return fmt.Errorf("unable to parse shellcheck report: %w", err)
 	}
@@ -81,14 +80,15 @@ func runShellcheck(options *Options, fileNames []string, scriptMap map[string]re
 		return fmt.Errorf("unable to format shellcheck report: %w", err)
 	}
 
-	if writeErr := writeReport(options, reportString); writeErr != nil {
+	writer := NewReportWriter(options)
+	if writeErr := writeReport(writer, reportString); writeErr != nil {
 		return writeErr
 	}
 
 	return &ScriptCheckError{report}
 }
 
-func executeShellCheck(scriptMap map[string]reader.ScriptBlock, options *Options, fileNames []string) ([]format.ScriptCheckReport, error) {
+func executeShellCheckCommand(scriptMap map[string]reader.ScriptBlock, options *Options, fileNames []string) ([]format.ScriptCheckReport, error) {
 	out := new(bytes.Buffer)
 	cmd := exec.Command("shellcheck", fileNames...)
 	cmd.Dir, _ = os.Getwd()
@@ -120,24 +120,8 @@ func executeShellCheck(scriptMap map[string]reader.ScriptBlock, options *Options
 	}
 }
 
-func writeReport(options *Options, report string) error {
-	var writerFile *os.File
-	switch options.OutputFile {
-	case StdoutOutput:
-		writerFile = os.Stdout
-	default:
-		file, err := os.Create(options.OutputFile)
-		if err != nil {
-			return err
-		}
-		writerFile = file
-
-		defer func() {
-			_ = file.Close()
-		}()
-	}
-
-	_, err := writerFile.WriteString(report)
+func writeReport(writer io.StringWriter, report string) error {
+	_, err := writer.WriteString(report)
 	if err != nil {
 		return fmt.Errorf("unable to write shellcheck output: %w", err)
 	}
@@ -151,9 +135,18 @@ func writeTempFiles(options *Options, scripts []reader.ScriptBlock) (*string, ma
 		return nil, nil, fmt.Errorf("failed to create temp dir: %s", err.Error())
 	}
 
+	if options.Debug {
+		log.Printf(
+			"Created intermediate directory %s",
+			format.Color(tempDir, format.Bold),
+		)
+	}
+
+	writer := NewTempDirWriter(tempDir, options.Shell)
+
 	var fileNames = make(map[string]reader.ScriptBlock)
 	for _, script := range scripts {
-		file, err := createTempFile(options, tempDir, script)
+		file, err := writer.WriteScript(script)
 		if err != nil {
 			return &tempDir, nil, fmt.Errorf("unable to create temporary file %w", err)
 		}
@@ -161,44 +154,4 @@ func writeTempFiles(options *Options, scripts []reader.ScriptBlock) (*string, ma
 	}
 
 	return &tempDir, fileNames, nil
-}
-
-func createTempFile(options *Options, tempDir string, script reader.ScriptBlock) (*os.File, error) {
-	filePath := script.GetOutputFilePath("")
-	transformedFileName := strings.ReplaceAll(filePath, "/", "")
-	filePattern := fmt.Sprintf("script-*-%s", transformedFileName)
-	tempF, err := os.CreateTemp(tempDir, filePattern)
-	if err != nil {
-		return nil, fmt.Errorf("unable to create temp file: %s", err.Error())
-	}
-
-	// write into file
-	err = writeScriptBlock(tempF, options, script)
-	if err != nil {
-		return nil, err
-	}
-
-	return tempF, nil
-}
-
-func writeScriptBlock(file *os.File, options *Options, script reader.ScriptBlock) error {
-	// ensure every script starts either with a script or shellcheck directive
-	if !script.Script.HasShell() {
-		var scriptShell string
-		if len(script.Shell) > 0 {
-			scriptShell = script.Shell
-		} else {
-			scriptShell = options.Shell
-		}
-
-		if _, err := file.WriteString(fmt.Sprintf("# shellcheck shell=%s\n", scriptShell)); err != nil {
-			return fmt.Errorf("unable to write to file: %s", err.Error())
-		}
-	}
-
-	if _, err := file.WriteString(script.ScriptString()); err != nil {
-		return fmt.Errorf("unable to write to file: %s", err.Error())
-	}
-
-	return nil
 }

@@ -15,18 +15,13 @@ func newCheckCommand(options *runtime.Options) *cobra.Command {
 		Short: "Run shellcheck against scripts in pipeline yml files",
 		Long:  "Run shellcheck against scripts in pipeline yml files",
 		Args:  cobra.MinimumNArgs(1),
-		Run: func(cmd *cobra.Command, files []string) {
-			if err := runtime.CheckScripts(options, files); err != nil {
+		Run: func(cmd *cobra.Command, globPatterns []string) {
+			if err := runtime.CheckFiles(options, globPatterns); err != nil {
 				var scriptCheckError *runtime.ScriptCheckError
-				/*
-					if errors.As(err, &exitError) {
-							os.Exit(exitError.ExitCode())
-						}
-				*/
 				if errors.As(err, &scriptCheckError) {
 					log.Printf(
 						"Found %s issues, exiting...",
-						format.Color(len(scriptCheckError.Reports), format.Bold),
+						format.Color(scriptCheckError.ReportCount(), format.Bold),
 					)
 					os.Exit(1)
 				} else {

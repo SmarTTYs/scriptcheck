@@ -9,8 +9,8 @@ import (
 	"scriptcheck/reader"
 )
 
-func ExtractScripts(options *Options, fileNames []string) error {
-	scripts, files, err := collectAndExtractScripts(options, fileNames)
+func ExtractScripts(options *Options, globPatterns []string) error {
+	scripts, files, err := collectAndExtractScripts(options, globPatterns)
 	if err != nil {
 		return err
 	}
@@ -21,9 +21,8 @@ func ExtractScripts(options *Options, fileNames []string) error {
 		format.Color(len(files), format.Bold),
 	)
 
-	err = writeFiles(options, scripts)
-	if err != nil {
-		return err
+	if writeErr := writeFiles(options, scripts); writeErr != nil {
+		return writeErr
 	}
 
 	log.Printf(
@@ -70,7 +69,7 @@ func createAndWriteFile(options *Options, script reader.ScriptBlock, directory s
 	}()
 
 	// write into file
-	err = writeScriptBlock(file, options, script)
+	err = writeScriptBlock(file, options.Shell, script)
 	if err != nil {
 		return err
 	}

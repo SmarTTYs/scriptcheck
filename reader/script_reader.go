@@ -87,12 +87,10 @@ func (d ScriptDecoder) DecodeFile(file string) ([]ScriptBlock, error) {
 }
 
 func (d ScriptDecoder) MergeAndDecode(files []string) ([]ScriptBlock, error) {
-	mergedFile, err := mergeFiles(files)
-	if err != nil {
+	if mergedFile, err := mergeFiles(files); err != nil {
 		return nil, err
 	} else {
-		scripts, err := d.decodeAstFile(mergedFile)
-		return scripts, err
+		return d.decodeAstFile(mergedFile)
 	}
 }
 

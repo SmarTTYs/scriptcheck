@@ -10,8 +10,8 @@ import (
 
 const StdoutOutput = "stdout"
 
-func collectAndExtractScripts(options *Options, fileNames []string) ([]reader.ScriptBlock, []string, error) {
-	files, err := collectFiles(fileNames)
+func collectAndExtractScripts(options *Options, globPatterns []string) ([]reader.ScriptBlock, []string, error) {
+	files, err := collectFiles(globPatterns)
 	if err != nil {
 		return nil, nil, err
 	}
