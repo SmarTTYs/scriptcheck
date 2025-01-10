@@ -10,7 +10,6 @@ func NewOptions() *Options {
 }
 
 type Options struct {
-	Shell      string
 	OutputFile string
 
 	PipelineType reader.PipelineType

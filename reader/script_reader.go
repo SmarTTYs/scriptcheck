@@ -70,13 +70,32 @@ type ScriptBlock struct {
 	StartPos int
 }
 
+func (script ScriptBlock) ScriptString() string {
+	builder := new(strings.Builder)
+	if !script.Script.HasShell() {
+		var scriptShell string
+		if len(script.Shell) > 0 {
+			scriptShell = script.Shell
+		} else {
+			scriptShell = "sh"
+		}
+
+		builder.WriteString(fmt.Sprintf("# shellcheck shell=%s\n", scriptShell))
+	}
+
+	builder.WriteString(string(script.Script))
+	return builder.String()
+}
+
 func (s Script) HasShell() bool {
 	return strings.HasPrefix(string(s), "#!")
 }
 
+/*
 func (script ScriptBlock) ScriptString() string {
 	return string(script.Script)
 }
+*/
 
 func (d ScriptDecoder) DecodeFile(file string) ([]ScriptBlock, error) {
 	if astFile, err := readFile(file); err != nil {
@@ -115,6 +134,17 @@ func (d ScriptDecoder) decodeAstFile(astFile *ast.File) ([]ScriptBlock, error) {
 	scriptBlocks = append(scriptBlocks, readerScripts...)
 
 	return scriptBlocks, nil
+}
+
+func (script ScriptBlock) OutputFileName() string {
+	sBuilder := new(strings.Builder)
+	extension := filepath.Ext(script.FileName)
+	sBuilder.WriteString(script.FileName[:len(script.FileName)-len(extension)])
+	sBuilder.WriteRune('-')
+	sBuilder.WriteString(script.BlockName)
+	sBuilder.WriteString(".sh")
+
+	return sBuilder.String()
 }
 
 func (script ScriptBlock) GetOutputFilePath(parentDir string) string {

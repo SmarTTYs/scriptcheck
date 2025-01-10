@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path"
 	"path/filepath"
 	"scriptcheck/reader"
-	"strings"
 )
 
 func NewReportWriter(options *Options) io.StringWriter {
@@ -23,17 +23,17 @@ func NewReportWriter(options *Options) io.StringWriter {
 type ScriptWriter interface {
 	io.StringWriter
 
+	WriteScriptTest(directory string, script reader.ScriptBlock) (*os.File, error)
 	WriteScript(script reader.ScriptBlock) (*os.File, error)
 }
 
-func NewDirWriter(dir, defaultShell string) ScriptWriter {
+func NewDirWriter(dir string) ScriptWriter {
 	return &TempScriptWriter{
-		directory:    dir,
-		defaultShell: defaultShell,
+		directory: dir,
 	}
 }
 
-func NewTempDirWriter(dir, defaultShell string) ScriptWriter {
+func NewTempDirWriter(dir string) ScriptWriter {
 	/*
 		test := &DirScriptWriter{
 			fileCreator: func(s string) (*os.File, error) {
@@ -49,29 +49,31 @@ func NewTempDirWriter(dir, defaultShell string) ScriptWriter {
 	*/
 
 	return &TempScriptWriter{
-		directory:    dir,
-		defaultShell: defaultShell,
+		directory: dir,
 	}
 }
 
 type TempScriptWriter struct {
 	ScriptWriter
 
-	directory    string
-	defaultShell string
+	directory string
 }
 
 type DirScriptWriter struct {
 	ScriptWriter
 
-	directory    string
-	defaultShell string
-
+	directory   string
 	fileCreator func(string) (*os.File, error)
 }
 
+func (w *DirScriptWriter) WriteScriptTest(directory string, script reader.ScriptBlock) (*os.File, error) {
+	w.directory = directory
+	return w.WriteScript(script)
+}
+
 func (w *DirScriptWriter) WriteScript(script reader.ScriptBlock) (*os.File, error) {
-	filePath := script.GetOutputFilePath(w.directory)
+	println("Directory", w.directory)
+	filePath := path.Join(w.directory, script.OutputFileName())
 
 	// create nested directories
 	err := os.MkdirAll(filepath.Dir(filePath), os.ModePerm)
@@ -79,7 +81,6 @@ func (w *DirScriptWriter) WriteScript(script reader.ScriptBlock) (*os.File, erro
 		return nil, err
 	}
 
-	// todo: this could be done by using the new filewriter
 	file, err := os.Create(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create file: %s", err.Error())
@@ -90,7 +91,7 @@ func (w *DirScriptWriter) WriteScript(script reader.ScriptBlock) (*os.File, erro
 	}()
 
 	// write into file
-	err = writeScriptBlock(file, w.defaultShell, script)
+	err = writeScriptBlock(file, script)
 	if err != nil {
 		return nil, err
 	}
@@ -104,12 +105,8 @@ func (w *TempScriptWriter) WriteScript(script reader.ScriptBlock) (*os.File, err
 		return nil, fmt.Errorf("unable to create temp file: %s", err.Error())
 	}
 
-	writeErr := writeScriptBlock(tempF, w.defaultShell, script)
-	if writeErr != nil {
-		return nil, writeErr
-	}
-
-	return tempF, nil
+	writeErr := writeScriptBlock(tempF, script)
+	return tempF, writeErr
 }
 
 func (w *TempScriptWriter) WriteString(_ string) (n int, err error) {
@@ -139,28 +136,11 @@ func (writer FileWriter) WriteString(s string) (int, error) {
 	return file.WriteString(s)
 }
 
-func writeScriptBlock(writer io.StringWriter, defaultShell string, script reader.ScriptBlock) error {
-	scriptString := scriptBlockString(script, defaultShell)
+func writeScriptBlock(writer io.StringWriter, script reader.ScriptBlock) error {
+	scriptString := script.ScriptString()
 	if _, err := writer.WriteString(scriptString); err != nil {
 		return fmt.Errorf("unable to write to file: %w", err)
 	}
 
 	return nil
-}
-
-func scriptBlockString(script reader.ScriptBlock, defaultShell string) string {
-	builder := new(strings.Builder)
-	if !script.Script.HasShell() {
-		var scriptShell string
-		if len(script.Shell) > 0 {
-			scriptShell = script.Shell
-		} else {
-			scriptShell = defaultShell
-		}
-
-		builder.WriteString(fmt.Sprintf("# shellcheck shell=%s\n", scriptShell))
-	}
-
-	builder.WriteString(script.ScriptString())
-	return builder.String()
 }

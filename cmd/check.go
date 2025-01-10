@@ -40,14 +40,6 @@ func newCheckCommand(options *runtime.Options) *cobra.Command {
 		"output file to write into",
 	)
 
-	checkCmd.Flags().StringVarP(
-		&options.Shell,
-		"shell",
-		"s",
-		"sh",
-		"Shell to pass to shellcheck",
-	)
-
 	checkCmd.Flags().StringArrayVarP(
 		&options.ShellCheckArgs,
 		"args",

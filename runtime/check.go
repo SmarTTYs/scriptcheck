@@ -92,7 +92,6 @@ func executeShellCheckCommand(scriptMap map[string]reader.ScriptBlock, options *
 	out := new(bytes.Buffer)
 	cmd := exec.Command("shellcheck", fileNames...)
 	cmd.Dir, _ = os.Getwd()
-	cmd.Args = append(cmd.Args, "--shell", options.Shell)
 	cmd.Stderr = os.Stderr
 	cmd.Stdout = out
 
@@ -142,7 +141,7 @@ func writeTempFiles(options *Options, scripts []reader.ScriptBlock) (*string, ma
 		)
 	}
 
-	writer := NewTempDirWriter(tempDir, options.Shell)
+	writer := NewTempDirWriter(tempDir)
 
 	var fileNames = make(map[string]reader.ScriptBlock)
 	for _, script := range scripts {

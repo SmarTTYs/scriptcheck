@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path"
 	"path/filepath"
 	"scriptcheck/format"
 	"scriptcheck/reader"
@@ -37,21 +38,32 @@ func ExtractScripts(options *Options, globPatterns []string) error {
 func writeFiles(options *Options, scripts []reader.ScriptBlock) error {
 	err := os.MkdirAll(options.OutputDirectory, os.ModePerm)
 	if err != nil {
-		return fmt.Errorf("failed to create temp dir: %s", err.Error())
+		return fmt.Errorf("failed to create dir: %s", err.Error())
+	}
+
+	dirWriter := DirScriptWriter{
+		directory: options.OutputDirectory,
 	}
 
 	for _, script := range scripts {
-		err := createAndWriteFile(options, script, options.OutputDirectory)
+		_, err2 := dirWriter.WriteScriptTest(options.OutputDirectory+"/experimental", script)
+		if err2 != nil {
+			println("Err2", err2.Error())
+			return err2
+		}
+
+		// todo: prepare for removal
+		err := createAndWriteFile(script, options.OutputDirectory)
 		if err != nil {
-			return fmt.Errorf("unable to create temporary file %w", err)
+			return fmt.Errorf("unable to create file: %w", err)
 		}
 	}
 
 	return nil
 }
 
-func createAndWriteFile(options *Options, script reader.ScriptBlock, directory string) error {
-	filePath := script.GetOutputFilePath(directory)
+func createAndWriteFile(script reader.ScriptBlock, directory string) error {
+	filePath := path.Join(directory, script.OutputFileName())
 
 	// create nested directories
 	err := os.MkdirAll(filepath.Dir(filePath), os.ModePerm)
@@ -69,10 +81,5 @@ func createAndWriteFile(options *Options, script reader.ScriptBlock, directory s
 	}()
 
 	// write into file
-	err = writeScriptBlock(file, options.Shell, script)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return writeScriptBlock(file, script)
 }

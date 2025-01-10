@@ -19,7 +19,6 @@ func newExtractCommand(options *runtime.Options) *cobra.Command {
 		},
 	}
 
-	extractCommand.Flags().StringVarP(&options.Shell, "shell", "s", "sh", "Standard shell used for shellcheck directives")
 	extractCommand.Flags().StringVarP(&options.OutputDirectory, "output", "o", "scripts", "Directory to extract files to")
 
 	return extractCommand
