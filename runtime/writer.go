@@ -20,37 +20,20 @@ func NewReportWriter(options *Options) io.StringWriter {
 	}
 }
 
+func NewTempDirScriptWriter(tempDir string) ScriptWriter {
+	return &TempScriptWriter{
+		directory: tempDir,
+	}
+}
+
+func NewDirScriptWriter(dir string) ScriptWriter {
+	return &DirScriptWriter{
+		directory: dir,
+	}
+}
+
 type ScriptWriter interface {
-	io.StringWriter
-
-	WriteScriptTest(directory string, script reader.ScriptBlock) (*os.File, error)
 	WriteScript(script reader.ScriptBlock) (*os.File, error)
-}
-
-func NewDirWriter(dir string) ScriptWriter {
-	return &TempScriptWriter{
-		directory: dir,
-	}
-}
-
-func NewTempDirWriter(dir string) ScriptWriter {
-	/*
-		test := &DirScriptWriter{
-			fileCreator: func(s string) (*os.File, error) {
-				return os.Create(s)
-			},
-		}
-
-		test2 := &DirScriptWriter{
-			fileCreator: func(s string) (*os.File, error) {
-				return os.CreateTemp(dir, "script-*")
-			},
-		}
-	*/
-
-	return &TempScriptWriter{
-		directory: dir,
-	}
 }
 
 type TempScriptWriter struct {
@@ -62,28 +45,21 @@ type TempScriptWriter struct {
 type DirScriptWriter struct {
 	ScriptWriter
 
-	directory   string
-	fileCreator func(string) (*os.File, error)
-}
-
-func (w *DirScriptWriter) WriteScriptTest(directory string, script reader.ScriptBlock) (*os.File, error) {
-	w.directory = directory
-	return w.WriteScript(script)
+	directory string
 }
 
 func (w *DirScriptWriter) WriteScript(script reader.ScriptBlock) (*os.File, error) {
-	println("Directory", w.directory)
 	filePath := path.Join(w.directory, script.OutputFileName())
 
 	// create nested directories
 	err := os.MkdirAll(filepath.Dir(filePath), os.ModePerm)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create dir: %w", err)
 	}
 
 	file, err := os.Create(filePath)
 	if err != nil {
-		return nil, fmt.Errorf("unable to create file: %s", err.Error())
+		return nil, fmt.Errorf("unable to create file: %w", err)
 	}
 
 	defer func() {
@@ -91,12 +67,8 @@ func (w *DirScriptWriter) WriteScript(script reader.ScriptBlock) (*os.File, erro
 	}()
 
 	// write into file
-	err = writeScriptBlock(file, script)
-	if err != nil {
-		return nil, err
-	}
-
-	return file, nil
+	writeErr := writeScriptBlock(file, script)
+	return file, writeErr
 }
 
 func (w *TempScriptWriter) WriteScript(script reader.ScriptBlock) (*os.File, error) {
@@ -105,22 +77,22 @@ func (w *TempScriptWriter) WriteScript(script reader.ScriptBlock) (*os.File, err
 		return nil, fmt.Errorf("unable to create temp file: %s", err.Error())
 	}
 
+	defer func() {
+		_ = tempF.Close()
+	}()
+
 	writeErr := writeScriptBlock(tempF, script)
 	return tempF, writeErr
-}
-
-func (w *TempScriptWriter) WriteString(_ string) (n int, err error) {
-	return 0, err
-}
-
-type FileWriter struct {
-	fileName string
 }
 
 type StdoutWriter struct{}
 
 func (StdoutWriter) WriteString(s string) (int, error) {
 	return os.Stdout.WriteString(s)
+}
+
+type FileWriter struct {
+	fileName string
 }
 
 func (writer FileWriter) WriteString(s string) (int, error) {

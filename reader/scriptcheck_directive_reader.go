@@ -7,12 +7,12 @@ import (
 func newScriptCheckDirectiveDecoder(decoder ScriptDecoder) ScriptDecoder {
 	return ScriptDecoder{
 		ScriptReader: &scriptcheckDirectiveReader{
-			parser:      decoder.Parser,
-			transformer: decoder.Transformer,
+			parser:      decoder.parser,
+			transformer: decoder.transformer,
 		},
-		Debug:       decoder.Debug,
-		Parser:      decoder.Parser,
-		Transformer: decoder.Transformer,
+		debug:       decoder.debug,
+		parser:      decoder.parser,
+		transformer: decoder.transformer,
 	}
 }
 
@@ -20,8 +20,8 @@ func newScriptCheckDirectiveDecoder(decoder ScriptDecoder) ScriptDecoder {
 type scriptcheckDirectiveReader struct {
 	ScriptReader
 
-	parser      ScriptParser
-	transformer ScriptTransformer
+	parser      scriptParser
+	transformer scriptTransformer
 }
 
 type scriptCheckDirectiveVisitor struct {
@@ -33,9 +33,9 @@ type scriptCheckDirectiveVisitor struct {
 
 	Scripts []ScriptBlock
 
-	parser        ScriptParser
-	transformer   ScriptTransformer
-	anchorNodeMap DocumentAnchorMap
+	parser        scriptParser
+	transformer   scriptTransformer
+	anchorNodeMap documentAnchorMap
 }
 
 func (r *scriptcheckDirectiveReader) readScriptsForAst(file *ast.File) ([]ScriptBlock, error) {
@@ -43,7 +43,7 @@ func (r *scriptcheckDirectiveReader) readScriptsForAst(file *ast.File) ([]Script
 		file:          file,
 		parser:        r.parser,
 		transformer:   r.transformer,
-		anchorNodeMap: make(DocumentAnchorMap),
+		anchorNodeMap: make(documentAnchorMap),
 	}
 
 	for _, doc := range file.Docs {

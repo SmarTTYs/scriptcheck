@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"io"
 	"log"
 	"maps"
 	"os"
@@ -13,11 +12,6 @@ import (
 	"scriptcheck/reader"
 	"slices"
 )
-
-func removeIntermediateScripts(path string) {
-	log.Printf("Removing intermediate directory %s", path)
-	_ = os.RemoveAll(path)
-}
 
 func CheckFiles(options *Options, globPatterns []string) error {
 	scripts, files, err := collectAndExtractScripts(options, globPatterns)
@@ -80,9 +74,10 @@ func runShellcheck(options *Options, fileNames []string, scriptMap map[string]re
 		return fmt.Errorf("unable to format shellcheck report: %w", err)
 	}
 
-	writer := NewReportWriter(options)
-	if writeErr := writeReport(writer, reportString); writeErr != nil {
-		return writeErr
+	reportWriter := NewReportWriter(options)
+	_, writerErr := reportWriter.WriteString(reportString)
+	if writerErr != nil {
+		return fmt.Errorf("unable to write shellcheck output: %w", err)
 	}
 
 	return &ScriptCheckError{report}
@@ -119,15 +114,6 @@ func executeShellCheckCommand(scriptMap map[string]reader.ScriptBlock, options *
 	}
 }
 
-func writeReport(writer io.StringWriter, report string) error {
-	_, err := writer.WriteString(report)
-	if err != nil {
-		return fmt.Errorf("unable to write shellcheck output: %w", err)
-	}
-
-	return nil
-}
-
 func writeTempFiles(options *Options, scripts []reader.ScriptBlock) (*string, map[string]reader.ScriptBlock, error) {
 	tempDir, err := os.MkdirTemp("", "scripts")
 	if err != nil {
@@ -141,16 +127,26 @@ func writeTempFiles(options *Options, scripts []reader.ScriptBlock) (*string, ma
 		)
 	}
 
-	writer := NewTempDirWriter(tempDir)
+	scriptWriter := NewTempDirScriptWriter(tempDir)
+	fileScriptMap, err := writeReports(scriptWriter, scripts)
 
+	return &tempDir, fileScriptMap, err
+}
+
+func writeReports(scriptWriter ScriptWriter, scripts []reader.ScriptBlock) (map[string]reader.ScriptBlock, error) {
 	var fileNames = make(map[string]reader.ScriptBlock)
 	for _, script := range scripts {
-		file, err := writer.WriteScript(script)
+		file, err := scriptWriter.WriteScript(script)
 		if err != nil {
-			return &tempDir, nil, fmt.Errorf("unable to create temporary file %w", err)
+			return nil, fmt.Errorf("unable to create temporary file %w", err)
 		}
 		fileNames[file.Name()] = script
 	}
 
-	return &tempDir, fileNames, nil
+	return fileNames, nil
+}
+
+func removeIntermediateScripts(path string) {
+	log.Printf("Removing intermediate directory %s", path)
+	_ = os.RemoveAll(path)
 }

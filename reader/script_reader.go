@@ -5,8 +5,6 @@ import (
 	"github.com/goccy/go-yaml/ast"
 	"github.com/goccy/go-yaml/parser"
 	"log"
-	"path/filepath"
-	"strings"
 )
 
 type PipelineType string
@@ -24,9 +22,9 @@ func NewDecoder(pipelineType PipelineType, debug bool) ScriptDecoder {
 	panic(fmt.Sprintf("unknown pipeline type: %s", pipelineType))
 }
 
-type DocumentAnchorMap map[string]ast.Node
-type ScriptParser func(document *ast.DocumentNode, node ast.Node, anchorMap map[string]ast.Node) string
-type ScriptTransformer func(script string) string
+type documentAnchorMap map[string]ast.Node
+type scriptParser func(document *ast.DocumentNode, node ast.Node, anchorMap map[string]ast.Node) string
+type scriptTransformer func(script string) string
 
 type ScriptReader interface {
 	readScriptsForAst(file *ast.File) ([]ScriptBlock, error)
@@ -35,9 +33,9 @@ type ScriptReader interface {
 type ScriptDecoder struct {
 	ScriptReader
 
-	Debug       bool
-	Parser      ScriptParser
-	Transformer ScriptTransformer
+	debug       bool
+	parser      scriptParser
+	transformer scriptTransformer
 }
 
 func NewScriptBlock(file, key, jobName, script string, node ast.Node) ScriptBlock {
@@ -53,49 +51,6 @@ func NewScriptBlock(file, key, jobName, script string, node ast.Node) ScriptBloc
 		StartPos: line,
 	}
 }
-
-type Script string
-
-type ScriptBlock struct {
-	FileName  string
-	BlockName string
-	Script    Script
-	Shell     string
-	Path      string
-
-	// todo: currently does not work as expected
-	//  as positional information seem to be incorrect
-	//  in some cases
-	Column   int
-	StartPos int
-}
-
-func (script ScriptBlock) ScriptString() string {
-	builder := new(strings.Builder)
-	if !script.Script.HasShell() {
-		var scriptShell string
-		if len(script.Shell) > 0 {
-			scriptShell = script.Shell
-		} else {
-			scriptShell = "sh"
-		}
-
-		builder.WriteString(fmt.Sprintf("# shellcheck shell=%s\n", scriptShell))
-	}
-
-	builder.WriteString(string(script.Script))
-	return builder.String()
-}
-
-func (s Script) HasShell() bool {
-	return strings.HasPrefix(string(s), "#!")
-}
-
-/*
-func (script ScriptBlock) ScriptString() string {
-	return string(script.Script)
-}
-*/
 
 func (d ScriptDecoder) DecodeFile(file string) ([]ScriptBlock, error) {
 	if astFile, err := readFile(file); err != nil {
@@ -116,13 +71,13 @@ func (d ScriptDecoder) MergeAndDecode(files []string) ([]ScriptBlock, error) {
 func (d ScriptDecoder) decodeAstFile(astFile *ast.File) ([]ScriptBlock, error) {
 	scriptBlocks := make([]ScriptBlock, 0)
 	readerScripts, err := d.readScriptsForAst(astFile)
-	if d.Debug {
+	if d.debug {
 		log.Printf("Extracted %d script(s) from file '%s'\n", len(readerScripts), astFile.Name)
 	}
 
 	directiveDecoder := newScriptCheckDirectiveDecoder(d)
 	directiveScripts, err := directiveDecoder.readScriptsForAst(astFile)
-	if d.Debug {
+	if d.debug {
 		log.Printf("Extracted %d script(s) from directives for file '%s'\n", len(readerScripts), astFile.Name)
 	}
 
@@ -134,30 +89,6 @@ func (d ScriptDecoder) decodeAstFile(astFile *ast.File) ([]ScriptBlock, error) {
 	scriptBlocks = append(scriptBlocks, readerScripts...)
 
 	return scriptBlocks, nil
-}
-
-func (script ScriptBlock) OutputFileName() string {
-	sBuilder := new(strings.Builder)
-	extension := filepath.Ext(script.FileName)
-	sBuilder.WriteString(script.FileName[:len(script.FileName)-len(extension)])
-	sBuilder.WriteRune('-')
-	sBuilder.WriteString(script.BlockName)
-	sBuilder.WriteString(".sh")
-
-	return sBuilder.String()
-}
-
-func (script ScriptBlock) GetOutputFilePath(parentDir string) string {
-	sBuilder := new(strings.Builder)
-	extension := filepath.Ext(script.FileName)
-	sBuilder.WriteString(parentDir)
-	sBuilder.WriteRune(filepath.Separator)
-	sBuilder.WriteString(script.FileName[:len(script.FileName)-len(extension)])
-	sBuilder.WriteRune('-')
-	sBuilder.WriteString(script.BlockName)
-	sBuilder.WriteString(".sh")
-
-	return sBuilder.String()
 }
 
 func readFile(file string) (*ast.File, error) {

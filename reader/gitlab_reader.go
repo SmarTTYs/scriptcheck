@@ -27,11 +27,11 @@ var sections = []string{
 func NewGitlabDecoder(debug bool) ScriptDecoder {
 	decoder := ScriptDecoder{
 		ScriptReader: gitlabScriptReader{
-			anchorNodeMap: make(DocumentAnchorMap),
+			anchorNodeMap: make(documentAnchorMap),
 		},
-		Debug:       debug,
-		Parser:      readScriptFromNode,
-		Transformer: replaceJobInputReference,
+		debug:       debug,
+		parser:      readScriptFromNode,
+		transformer: replaceJobInputReference,
 	}
 
 	return decoder
@@ -41,7 +41,7 @@ type gitlabScriptReader struct {
 	ScriptReader
 	// currently looped document
 	document      *ast.DocumentNode
-	anchorNodeMap DocumentAnchorMap
+	anchorNodeMap documentAnchorMap
 }
 
 func (r gitlabScriptReader) readScriptsForAst(file *ast.File) ([]ScriptBlock, error) {
