@@ -5,6 +5,7 @@ import (
 	"github.com/goccy/go-yaml/ast"
 	"github.com/goccy/go-yaml/parser"
 	"log"
+	"scriptcheck/color"
 )
 
 type PipelineType string
@@ -38,20 +39,6 @@ type ScriptDecoder struct {
 	transformer scriptTransformer
 }
 
-func NewScriptBlock(file, key, jobName, script string, node ast.Node) ScriptBlock {
-	line := readLineFromNode(node)
-	// pos := readPositionFromNode(node)
-	return ScriptBlock{
-		FileName:  file,
-		BlockName: jobName + "_" + key,
-		Script:    Script(script),
-		Path:      node.GetPath(),
-
-		// Column:   position.Column,
-		StartPos: line,
-	}
-}
-
 func (d ScriptDecoder) DecodeFile(file string) ([]ScriptBlock, error) {
 	if astFile, err := readFile(file); err != nil {
 		return nil, err
@@ -72,13 +59,21 @@ func (d ScriptDecoder) decodeAstFile(astFile *ast.File) ([]ScriptBlock, error) {
 	scriptBlocks := make([]ScriptBlock, 0)
 	readerScripts, err := d.readScriptsForAst(astFile)
 	if d.debug {
-		log.Printf("Extracted %d script(s) from file '%s'\n", len(readerScripts), astFile.Name)
+		log.Printf(
+			"Extracted %s script(s) from file '%s'\n",
+			color.Color(len(readerScripts), color.Bold),
+			color.Color(astFile.Name, color.Bold),
+		)
 	}
 
 	directiveDecoder := newScriptCheckDirectiveDecoder(d)
 	directiveScripts, err := directiveDecoder.readScriptsForAst(astFile)
 	if d.debug {
-		log.Printf("Extracted %d script(s) from directives for file '%s'\n", len(readerScripts), astFile.Name)
+		log.Printf(
+			"Extracted %s script(s) from directives for file '%s'\n",
+			color.Color(len(directiveScripts), color.Bold),
+			color.Color(astFile.Name, color.Bold),
+		)
 	}
 
 	if err != nil {

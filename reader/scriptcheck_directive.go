@@ -31,7 +31,7 @@ func (d ScriptDirective) ShellDirective() string {
 	return d["shell"]
 }
 
-func ScriptDirectiveFromComment(comment *ast.CommentGroupNode) *ScriptDirective {
+func scriptDirectiveFromComment(comment *ast.CommentGroupNode) *ScriptDirective {
 	if marker := findScriptCheckMarker(comment); marker != nil {
 		directive := scriptDirectiveFromString(*marker)
 		return &directive

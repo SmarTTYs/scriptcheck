@@ -5,6 +5,7 @@ import (
 	"github.com/spf13/cobra"
 	"log"
 	"os"
+	"scriptcheck/color"
 	"scriptcheck/format"
 	"scriptcheck/runtime"
 )
@@ -21,7 +22,7 @@ func newCheckCommand(options *runtime.Options) *cobra.Command {
 				if errors.As(err, &scriptCheckError) {
 					log.Printf(
 						"Found %s issues, exiting...",
-						format.Color(scriptCheckError.ReportCount(), format.Bold),
+						color.Color(scriptCheckError.ReportCount(), color.Bold),
 					)
 					os.Exit(1)
 				} else {

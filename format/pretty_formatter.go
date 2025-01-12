@@ -3,23 +3,25 @@ package format
 import (
 	"bufio"
 	"fmt"
+	"scriptcheck/color"
+	"scriptcheck/report"
 	"strings"
 )
 
 type PrettyFormatter struct {
 }
 
-func (f *PrettyFormatter) Format(reports []ScriptCheckReport) (string, error) {
+func (f *PrettyFormatter) Format(reports []report.ScriptCheckReport) (string, error) {
 	builder := new(strings.Builder)
 
-	fileReports := make(map[string]map[int][]ScriptCheckReport)
-	for _, report := range reports {
-		if lineMap, exists := fileReports[report.File]; !exists {
-			lineMap := make(map[int][]ScriptCheckReport)
-			lineMap[report.Line] = append(lineMap[report.Line], report)
-			fileReports[report.File] = lineMap
+	fileReports := make(map[string]map[int][]report.ScriptCheckReport)
+	for _, scriptReport := range reports {
+		if lineMap, exists := fileReports[scriptReport.File]; !exists {
+			lineMap := make(map[int][]report.ScriptCheckReport)
+			lineMap[scriptReport.Line] = append(lineMap[scriptReport.Line], scriptReport)
+			fileReports[scriptReport.File] = lineMap
 		} else {
-			lineMap[report.Line] = append(lineMap[report.Line], report)
+			lineMap[scriptReport.Line] = append(lineMap[scriptReport.Line], scriptReport)
 		}
 	}
 
@@ -39,17 +41,17 @@ func (f *PrettyFormatter) Format(reports []ScriptCheckReport) (string, error) {
 	return builder.String(), nil
 }
 
-func (f *PrettyFormatter) appendGroupedReport(builder *strings.Builder, file string, line int, reports []ScriptCheckReport) {
-	builder.WriteString(Color(fmt.Sprintf("In %s line %d:", file, line), Bold))
+func (f *PrettyFormatter) appendGroupedReport(builder *strings.Builder, file string, line int, reports []report.ScriptCheckReport) {
+	builder.WriteString(color.Color(fmt.Sprintf("In %s line %d:", file, line), color.Bold))
 	builder.WriteString("\n")
 	builder.WriteString(f.getLine(reports[0]) + "\n")
 
 	informationList := make([]string, 0)
-	for _, report := range reports {
-		builder.WriteString(f.formatReportLine(report))
+	for _, scriptReport := range reports {
+		builder.WriteString(f.formatReportLine(scriptReport))
 		informationList = append(
 			informationList,
-			fmt.Sprintf("https://www.shellcheck.net/wiki/%s -- %s", report.Reason, report.Message),
+			fmt.Sprintf("https://www.shellcheck.net/wiki/%s -- %s", scriptReport.Reason, scriptReport.Message),
 		)
 	}
 
@@ -69,8 +71,8 @@ func (f *PrettyFormatter) appendReport(builder *strings.Builder, report ScriptCh
 }
 */
 
-func (f *PrettyFormatter) formatReportLine(report ScriptCheckReport) string {
-	color := f.getLevelColor(report.Level)
+func (f *PrettyFormatter) formatReportLine(report report.ScriptCheckReport) string {
+	levelColor := f.getLevelColor(report.Level)
 
 	prefix := strings.Repeat(" ", report.Column-1)
 	var marker string
@@ -80,33 +82,33 @@ func (f *PrettyFormatter) formatReportLine(report ScriptCheckReport) string {
 		marker = "^--"
 	}
 
-	return Color(fmt.Sprintf("%s%s %s (%s): %s\n", prefix, marker, report.Reason, report.Level, report.Message), color)
+	return color.Color(fmt.Sprintf("%s%s %s (%s): %s\n", prefix, marker, report.Reason, report.Level, report.Message), levelColor)
 }
 
 func (f *PrettyFormatter) getLevelColor(level string) string {
-	var color string
+	var levelColor string
 	switch level {
 	case "info":
-		color = Green
+		levelColor = color.Green
 	case "warning":
-		color = Yellow
+		levelColor = color.Yellow
 	case "error":
-		color = Red
+		levelColor = color.Red
 	case "style":
-		color = Blue
+		levelColor = color.Blue
 	default:
-		color = Red
+		levelColor = color.Red
 	}
 
-	return color
+	return levelColor
 }
 
-func (*PrettyFormatter) getLine(report ScriptCheckReport) string {
-	lineScanner := bufio.NewScanner(strings.NewReader(report.script.ScriptString()))
+func (*PrettyFormatter) getLine(report report.ScriptCheckReport) string {
+	lineScanner := bufio.NewScanner(strings.NewReader(report.Script.ScriptString()))
 	line := 0
 	for lineScanner.Scan() {
 		line++
-		if line == report.report.Line {
+		if line == report.Report.Line {
 			return lineScanner.Text()
 		}
 	}

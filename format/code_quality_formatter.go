@@ -3,6 +3,7 @@ package format
 import (
 	"encoding/json"
 	"github.com/google/uuid"
+	"scriptcheck/report"
 )
 
 type CodeQualityReportFormatter struct{}
@@ -20,16 +21,16 @@ type codeClimateReport struct {
 	} `json:"location"`
 }
 
-func (f *CodeQualityReportFormatter) Format(reports []ScriptCheckReport) (string, error) {
+func (f *CodeQualityReportFormatter) Format(reports []report.ScriptCheckReport) (string, error) {
 	codeClimateReports := make([]codeClimateReport, 0)
-	for _, report := range reports {
+	for _, scriptReport := range reports {
 		codeClimateReport := codeClimateReport{}
-		codeClimateReport.Description = report.Message
-		codeClimateReport.CheckName = report.Reason
+		codeClimateReport.Description = scriptReport.Message
+		codeClimateReport.CheckName = scriptReport.Reason
 		codeClimateReport.Fingerprint = uuid.New().String()
-		codeClimateReport.Location.Path = report.File
-		codeClimateReport.Location.Lines.Begin = report.Line
-		codeClimateReport.Severity = severityFromShellcheck(report.Level)
+		codeClimateReport.Location.Path = scriptReport.File
+		codeClimateReport.Location.Lines.Begin = scriptReport.Line
+		codeClimateReport.Severity = severityFromShellcheck(scriptReport.Level)
 
 		codeClimateReports = append(codeClimateReports, codeClimateReport)
 	}

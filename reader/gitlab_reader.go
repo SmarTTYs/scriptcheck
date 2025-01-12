@@ -39,6 +39,7 @@ func NewGitlabDecoder(debug bool) ScriptDecoder {
 
 type gitlabScriptReader struct {
 	ScriptReader
+
 	// currently looped document
 	document      *ast.DocumentNode
 	anchorNodeMap documentAnchorMap
@@ -106,15 +107,15 @@ func (r gitlabScriptReader) readScriptsFromJob(file, jobName string, node *ast.M
 			script := readScriptFromNode(r.document, eValue, r.anchorNodeMap)
 			script = replaceJobInputReference(script)
 
+			blockName := jobName + "_" + eKey
 			scriptBlock := NewScriptBlock(
 				file,
-				eKey,
-				jobName,
+				blockName,
 				script,
 				eValue,
 			)
 
-			if directive := ScriptDirectiveFromComment(element.GetComment()); directive != nil {
+			if directive := scriptDirectiveFromComment(element.GetComment()); directive != nil {
 				scriptBlock.Shell = directive.ShellDirective()
 			}
 

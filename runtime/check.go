@@ -8,8 +8,10 @@ import (
 	"maps"
 	"os"
 	"os/exec"
+	"scriptcheck/color"
 	"scriptcheck/format"
 	"scriptcheck/reader"
+	"scriptcheck/report"
 	"slices"
 )
 
@@ -21,8 +23,8 @@ func CheckFiles(options *Options, globPatterns []string) error {
 
 	log.Printf(
 		"Checking %s script(s) from %s file(s)...\n",
-		format.Color(len(scripts), format.Bold),
-		format.Color(len(files), format.Bold),
+		color.Color(len(scripts), color.Bold),
+		color.Color(len(files), color.Bold),
 	)
 
 	return checkScripts(options, scripts)
@@ -47,7 +49,7 @@ func checkScripts(options *Options, scripts []reader.ScriptBlock) error {
 }
 
 type ScriptCheckError struct {
-	reports []format.ScriptCheckReport
+	reports []report.ScriptCheckReport
 }
 
 func (e ScriptCheckError) ReportCount() int {
@@ -83,7 +85,7 @@ func runShellcheck(options *Options, fileNames []string, scriptMap map[string]re
 	return &ScriptCheckError{report}
 }
 
-func executeShellCheckCommand(scriptMap map[string]reader.ScriptBlock, options *Options, fileNames []string) ([]format.ScriptCheckReport, error) {
+func executeShellCheckCommand(scriptMap map[string]reader.ScriptBlock, options *Options, fileNames []string) ([]report.ScriptCheckReport, error) {
 	out := new(bytes.Buffer)
 	cmd := exec.Command("shellcheck", fileNames...)
 	cmd.Dir, _ = os.Getwd()
@@ -107,7 +109,7 @@ func executeShellCheckCommand(scriptMap map[string]reader.ScriptBlock, options *
 		if errors.As(runErr, &exitError) && exitError.ExitCode() == 2 {
 			return nil, runErr
 		}
-		return format.NewScriptCheckReport(out.Bytes(), scriptMap)
+		return report.NewScriptCheckReport(out.Bytes(), scriptMap)
 	} else {
 		// nothing to do in this case
 		return nil, nil
@@ -123,7 +125,7 @@ func writeTempFiles(options *Options, scripts []reader.ScriptBlock) (*string, ma
 	if options.Debug {
 		log.Printf(
 			"Created intermediate directory %s",
-			format.Color(tempDir, format.Bold),
+			color.Color(tempDir, color.Bold),
 		)
 	}
 

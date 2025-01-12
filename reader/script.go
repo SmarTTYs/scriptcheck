@@ -2,11 +2,26 @@ package reader
 
 import (
 	"fmt"
+	"github.com/goccy/go-yaml/ast"
 	"path/filepath"
 	"strings"
 )
 
 type Script string
+
+func NewScriptBlock(file, blockName, script string, node ast.Node) ScriptBlock {
+	line := readLineFromNode(node)
+	// pos := readPositionFromNode(node)
+	return ScriptBlock{
+		FileName:  file,
+		BlockName: blockName,
+		Script:    Script(script),
+		Path:      node.GetPath(),
+
+		// Column:   position.Column,
+		StartPos: line,
+	}
+}
 
 type ScriptBlock struct {
 	FileName  string
@@ -24,22 +39,19 @@ type ScriptBlock struct {
 
 func (script ScriptBlock) ScriptString() string {
 	builder := new(strings.Builder)
-	if !script.Script.HasShell() {
-		var scriptShell string
-		if len(script.Shell) > 0 {
-			scriptShell = script.Shell
-		} else {
-			scriptShell = "sh"
-		}
-
-		builder.WriteString(fmt.Sprintf("# shellcheck shell=%s\n", scriptShell))
+	if script.HasShell() && !script.Script.hasShell() {
+		builder.WriteString(fmt.Sprintf("# shellcheck shell=%s\n", script.Shell))
 	}
 
 	builder.WriteString(string(script.Script))
 	return builder.String()
 }
 
-func (s Script) HasShell() bool {
+func (script ScriptBlock) HasShell() bool {
+	return len(script.Shell) > 0
+}
+
+func (s Script) hasShell() bool {
 	return strings.HasPrefix(string(s), "#!")
 }
 

@@ -2,7 +2,7 @@ package runtime
 
 import (
 	"log"
-	"scriptcheck/format"
+	"scriptcheck/color"
 	"scriptcheck/reader"
 )
 
@@ -14,8 +14,8 @@ func ExtractScripts(options *Options, globPatterns []string) error {
 
 	log.Printf(
 		"Extracting %s script(s) from %s file(s)...\n",
-		format.Color(len(scripts), format.Bold),
-		format.Color(len(files), format.Bold),
+		color.Color(len(scripts), color.Bold),
+		color.Color(len(files), color.Bold),
 	)
 
 	if writeErr := writeFiles(options, scripts); writeErr != nil {
@@ -24,8 +24,8 @@ func ExtractScripts(options *Options, globPatterns []string) error {
 
 	log.Printf(
 		"Successfully extracted %s scripts and saved into %s directory!",
-		format.Color(len(scripts), format.Bold),
-		format.Color(options.OutputDirectory, format.Bold),
+		color.Color(len(scripts), color.Bold),
+		color.Color(options.OutputDirectory, color.Bold),
 	)
 
 	return nil
