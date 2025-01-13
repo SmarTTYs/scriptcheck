@@ -86,7 +86,7 @@ func (v *scriptCheckDirectiveVisitor) Visit(node ast.Node) ast.Visitor {
 				v.file.Name,
 				blockName,
 				v.defaultShell,
-				Script(script),
+				script,
 				nodeValue,
 			)
 

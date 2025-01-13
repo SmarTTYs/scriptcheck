@@ -116,7 +116,7 @@ func (r gitlabScriptReader) readScriptsFromJob(file, jobName string, node *ast.M
 				file,
 				blockName,
 				r.defaultShell,
-				Script(script),
+				script,
 				eValue,
 			)
 
@@ -133,14 +133,15 @@ func (r gitlabScriptReader) readScriptsFromJob(file, jobName string, node *ast.M
 	return scripts
 }
 
-func replaceJobInputReference(script string) string {
-	for _, match := range jobInputRegex.FindAllString(script, -1) {
+func replaceJobInputReference(script Script) Script {
+	scriptString := string(script)
+	for _, match := range jobInputRegex.FindAllString(scriptString, -1) {
 		replaced := strings.TrimPrefix(match, "$")
 		replaced = strings.TrimFunc(replaced, func(r rune) bool {
 			return r == '[' || r == ']' || r == ' '
 		})
 		replaced = strings.ToUpper(replaced)
-		script = strings.Replace(script, match, "$"+replaced, -1)
+		script = Script(strings.Replace(scriptString, match, "$"+replaced, -1))
 	}
 
 	return script
@@ -155,12 +156,11 @@ func readLineFromNode(node ast.Node) int {
 	}
 }
 
-func readScriptFromNode(document *ast.DocumentNode, node ast.Node, anchorNodeMap map[string]ast.Node) string {
+func readScriptFromNode(document *ast.DocumentNode, node ast.Node, anchorNodeMap map[string]ast.Node) Script {
 	switch vType := node.(type) {
 	case *ast.TagNode:
 		if vType.Start.Value == gitlabReferenceTag {
-			script := readScriptFromReference(document, vType, anchorNodeMap)
-			return script
+			return readScriptFromReference(document, vType, anchorNodeMap)
 		} else {
 			log.Println("Unknown reference type")
 			return ""
@@ -175,16 +175,16 @@ func readScriptFromNode(document *ast.DocumentNode, node ast.Node, anchorNodeMap
 			return readScriptFromNode(document, anchorValue, anchorNodeMap)
 		}
 	case *ast.StringNode:
-		return vType.Value
+		return Script(vType.Value)
 	case *ast.LiteralNode:
-		return vType.Value.Value
+		return Script(vType.Value.Value)
 	case *ast.SequenceNode:
 		sb := new(strings.Builder)
 		for _, listElement := range vType.Values {
-			sb.WriteString(readScriptFromNode(document, listElement, anchorNodeMap))
+			sb.WriteString(string(readScriptFromNode(document, listElement, anchorNodeMap)))
 			sb.WriteString("\n")
 		}
-		return sb.String()
+		return Script(sb.String())
 	default:
 		return ""
 	}
@@ -199,7 +199,7 @@ func pathFromSequence(node *ast.SequenceNode) *yaml.Path {
 	return pathBuilder.Build()
 }
 
-func readScriptFromReference(document *ast.DocumentNode, tag *ast.TagNode, anchorNodeMap map[string]ast.Node) string {
+func readScriptFromReference(document *ast.DocumentNode, tag *ast.TagNode, anchorNodeMap map[string]ast.Node) Script {
 	pathValues := tag.Value.(*ast.SequenceNode)
 	pathString := pathFromSequence(pathValues)
 
