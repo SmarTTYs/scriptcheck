@@ -33,6 +33,13 @@ func newCheckCommand(options *runtime.Options) *cobra.Command {
 		},
 	}
 
+	checkCmd.Flags().StringVar(
+		&options.DefaultShell,
+		"default-shell",
+		"",
+		"Defines default shell dialect to use in case no shebang or scriptcheck directive is used. Per default NO dialect will get specified",
+	)
+
 	checkCmd.Flags().StringVarP(
 		&options.OutputFile,
 		"output",

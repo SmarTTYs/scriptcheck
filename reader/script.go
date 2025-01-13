@@ -9,14 +9,15 @@ import (
 
 type Script string
 
-func NewScriptBlock(file, blockName, script string, node ast.Node) ScriptBlock {
+func NewScriptBlock(file, blockName, defaultShell string, script Script, node ast.Node) ScriptBlock {
 	line := readLineFromNode(node)
 	// pos := readPositionFromNode(node)
 	return ScriptBlock{
 		FileName:  file,
 		BlockName: blockName,
-		Script:    Script(script),
+		Script:    script,
 		Path:      node.GetPath(),
+		Shell:     defaultShell,
 
 		// Column:   position.Column,
 		StartPos: line,

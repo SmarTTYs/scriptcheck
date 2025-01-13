@@ -30,7 +30,7 @@ func collectAndExtractScripts(options *Options, globPatterns []string) ([]reader
 }
 
 func extractScriptsFromFiles(options *Options, files []string) ([]reader.ScriptBlock, error) {
-	decoder := reader.NewDecoder(options.PipelineType, options.Debug)
+	decoder := reader.NewDecoder(options.PipelineType, options.Debug, options.DefaultShell)
 	scripts := make([]reader.ScriptBlock, 0)
 
 	if options.Merge {

@@ -9,10 +9,13 @@ func newScriptCheckDirectiveDecoder(decoder ScriptDecoder) ScriptDecoder {
 		ScriptReader: &scriptcheckDirectiveReader{
 			parser:      decoder.parser,
 			transformer: decoder.transformer,
+
+			defaultShell: decoder.defaultShell,
 		},
-		debug:       decoder.debug,
-		parser:      decoder.parser,
-		transformer: decoder.transformer,
+		defaultShell: decoder.defaultShell,
+		debug:        decoder.debug,
+		parser:       decoder.parser,
+		transformer:  decoder.transformer,
 	}
 }
 
@@ -20,13 +23,16 @@ func newScriptCheckDirectiveDecoder(decoder ScriptDecoder) ScriptDecoder {
 type scriptcheckDirectiveReader struct {
 	ScriptReader
 
-	parser      scriptParser
-	transformer scriptTransformer
+	defaultShell string
+	parser       scriptParser
+	transformer  scriptTransformer
 }
 
 type scriptCheckDirectiveVisitor struct {
 	ast.Visitor
 	file *ast.File
+
+	defaultShell string
 
 	// currently looped document
 	document *ast.DocumentNode
@@ -41,6 +47,7 @@ type scriptCheckDirectiveVisitor struct {
 func (r *scriptcheckDirectiveReader) readScriptsForAst(file *ast.File) ([]ScriptBlock, error) {
 	directiveWalker := &scriptCheckDirectiveVisitor{
 		file:          file,
+		defaultShell:  r.defaultShell,
 		parser:        r.parser,
 		transformer:   r.transformer,
 		anchorNodeMap: make(documentAnchorMap),
@@ -78,10 +85,15 @@ func (v *scriptCheckDirectiveVisitor) Visit(node ast.Node) ast.Visitor {
 			scriptBlock := NewScriptBlock(
 				v.file.Name,
 				blockName,
-				script,
+				v.defaultShell,
+				Script(script),
 				nodeValue,
 			)
-			scriptBlock.Shell = directive.ShellDirective()
+
+			if directiveShell := directive.ShellDirective(); directiveShell != "" {
+				scriptBlock.Shell = directiveShell
+			}
+
 			v.Scripts = append(v.Scripts, scriptBlock)
 		}
 	}

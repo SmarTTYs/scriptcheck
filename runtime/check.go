@@ -61,17 +61,17 @@ func (e ScriptCheckError) Error() string {
 }
 
 func runShellcheck(options *Options, fileNames []string, scriptMap map[string]reader.ScriptBlock) error {
-	report, err := executeShellCheckCommand(scriptMap, options, fileNames)
+	scriptCheckReports, err := executeShellCheckCommand(scriptMap, options, fileNames)
 	if err != nil {
 		return fmt.Errorf("unable to parse shellcheck report: %w", err)
 	}
 
-	if len(report) == 0 {
+	if len(scriptCheckReports) == 0 {
 		return nil
 	}
 
 	formatter := format.NewFormatter(options.Format)
-	reportString, err := formatter.Format(report)
+	reportString, err := formatter.Format(scriptCheckReports)
 	if err != nil {
 		return fmt.Errorf("unable to format shellcheck report: %w", err)
 	}
@@ -82,7 +82,7 @@ func runShellcheck(options *Options, fileNames []string, scriptMap map[string]re
 		return fmt.Errorf("unable to write shellcheck output: %w", err)
 	}
 
-	return &ScriptCheckError{report}
+	return &ScriptCheckError{scriptCheckReports}
 }
 
 func executeShellCheckCommand(scriptMap map[string]reader.ScriptBlock, options *Options, fileNames []string) ([]report.ScriptCheckReport, error) {
@@ -149,6 +149,9 @@ func writeReports(scriptWriter ScriptWriter, scripts []reader.ScriptBlock) (map[
 }
 
 func removeIntermediateScripts(path string) {
-	log.Printf("Removing intermediate directory %s", path)
+	log.Printf(
+		"Removing intermediate directory %s",
+		color.Color(path, color.Bold),
+	)
 	_ = os.RemoveAll(path)
 }

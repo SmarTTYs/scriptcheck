@@ -14,10 +14,10 @@ const (
 	PipelineTypeGitlab PipelineType = "gitlab"
 )
 
-func NewDecoder(pipelineType PipelineType, debug bool) ScriptDecoder {
+func NewDecoder(pipelineType PipelineType, debug bool, defaultShell string) ScriptDecoder {
 	switch pipelineType {
 	case PipelineTypeGitlab:
-		return NewGitlabDecoder(debug)
+		return newGitlabDecoder(debug, defaultShell)
 	}
 
 	panic(fmt.Sprintf("unknown pipeline type: %s", pipelineType))
@@ -34,7 +34,9 @@ type ScriptReader interface {
 type ScriptDecoder struct {
 	ScriptReader
 
-	debug       bool
+	defaultShell string
+	debug        bool
+
 	parser      scriptParser
 	transformer scriptTransformer
 }

@@ -24,14 +24,16 @@ var sections = []string{
 	"after_script",
 }
 
-func NewGitlabDecoder(debug bool) ScriptDecoder {
+func newGitlabDecoder(debug bool, defaultShell string) ScriptDecoder {
 	decoder := ScriptDecoder{
 		ScriptReader: gitlabScriptReader{
+			defaultShell:  defaultShell,
 			anchorNodeMap: make(documentAnchorMap),
 		},
-		debug:       debug,
-		parser:      readScriptFromNode,
-		transformer: replaceJobInputReference,
+		defaultShell: defaultShell,
+		debug:        debug,
+		parser:       readScriptFromNode,
+		transformer:  replaceJobInputReference,
 	}
 
 	return decoder
@@ -39,6 +41,8 @@ func NewGitlabDecoder(debug bool) ScriptDecoder {
 
 type gitlabScriptReader struct {
 	ScriptReader
+
+	defaultShell string
 
 	// currently looped document
 	document      *ast.DocumentNode
@@ -111,12 +115,15 @@ func (r gitlabScriptReader) readScriptsFromJob(file, jobName string, node *ast.M
 			scriptBlock := NewScriptBlock(
 				file,
 				blockName,
-				script,
+				r.defaultShell,
+				Script(script),
 				eValue,
 			)
 
 			if directive := scriptDirectiveFromComment(element.GetComment()); directive != nil {
-				scriptBlock.Shell = directive.ShellDirective()
+				if directiveShell := directive.ShellDirective(); directiveShell != "" {
+					scriptBlock.Shell = directiveShell
+				}
 			}
 
 			scripts = append(scripts, scriptBlock)
