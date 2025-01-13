@@ -7,12 +7,15 @@ import (
 func newScriptCheckDirectiveDecoder(decoder ScriptDecoder) ScriptDecoder {
 	return ScriptDecoder{
 		ScriptReader: &scriptcheckDirectiveReader{
-			parser:      decoder.Parser,
-			transformer: decoder.Transformer,
+			parser:      decoder.parser,
+			transformer: decoder.transformer,
+
+			defaultShell: decoder.defaultShell,
 		},
-		Debug:       decoder.Debug,
-		Parser:      decoder.Parser,
-		Transformer: decoder.Transformer,
+		defaultShell: decoder.defaultShell,
+		debug:        decoder.debug,
+		parser:       decoder.parser,
+		transformer:  decoder.transformer,
 	}
 }
 
@@ -20,30 +23,34 @@ func newScriptCheckDirectiveDecoder(decoder ScriptDecoder) ScriptDecoder {
 type scriptcheckDirectiveReader struct {
 	ScriptReader
 
-	parser      ScriptParser
-	transformer ScriptTransformer
+	defaultShell string
+	parser       scriptParser
+	transformer  scriptTransformer
 }
 
 type scriptCheckDirectiveVisitor struct {
 	ast.Visitor
 	file *ast.File
 
+	defaultShell string
+
 	// currently looped document
 	document *ast.DocumentNode
 
 	Scripts []ScriptBlock
 
-	parser        ScriptParser
-	transformer   ScriptTransformer
-	anchorNodeMap DocumentAnchorMap
+	parser        scriptParser
+	transformer   scriptTransformer
+	anchorNodeMap documentAnchorMap
 }
 
 func (r *scriptcheckDirectiveReader) readScriptsForAst(file *ast.File) ([]ScriptBlock, error) {
 	directiveWalker := &scriptCheckDirectiveVisitor{
 		file:          file,
+		defaultShell:  r.defaultShell,
 		parser:        r.parser,
 		transformer:   r.transformer,
-		anchorNodeMap: make(DocumentAnchorMap),
+		anchorNodeMap: make(documentAnchorMap),
 	}
 
 	for _, doc := range file.Docs {
@@ -67,19 +74,26 @@ func (v *scriptCheckDirectiveVisitor) Visit(node ast.Node) ast.Visitor {
 		return v
 	}
 
-	if directive := ScriptDirectiveFromComment(node.GetComment()); directive != nil {
+	if directive := scriptDirectiveFromComment(node.GetComment()); directive != nil {
 		mappingValueNode := node.(*ast.MappingValueNode)
 		name := mappingValueNode.Key.String()
+		nodeValue := mappingValueNode.Value
 
-		if script := v.parser(v.document, mappingValueNode.Value, v.anchorNodeMap); len(script) > 0 {
+		if script := v.parser(v.document, nodeValue, v.anchorNodeMap); len(script) > 0 {
 			script = v.transformer(script)
-			scriptBlock := ScriptBlock{
-				FileName:  v.file.Name,
-				BlockName: "directive-" + name,
-				Script:    Script(script),
-				Shell:     directive.ShellDirective(),
-				Path:      mappingValueNode.Value.GetPath(),
+			blockName := "directive_" + name
+			scriptBlock := NewScriptBlock(
+				v.file.Name,
+				blockName,
+				v.defaultShell,
+				script,
+				nodeValue,
+			)
+
+			if directiveShell := directive.ShellDirective(); directiveShell != "" {
+				scriptBlock.Shell = directiveShell
 			}
+
 			v.Scripts = append(v.Scripts, scriptBlock)
 		}
 	}

@@ -37,6 +37,13 @@ func newRootCmd() *cobra.Command {
 		"Whether to merge all input files into one file",
 	)
 
+	cmd.PersistentFlags().BoolVar(
+		&options.Strict,
+		"strict",
+		false,
+		"Whether to fail when no files got found",
+	)
+
 	typeOptions := []reader.PipelineType{reader.PipelineTypeGitlab}
 	enumVarP(
 		cmd.PersistentFlags(),

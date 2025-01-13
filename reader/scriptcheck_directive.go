@@ -19,7 +19,11 @@ func scriptDirectiveFromString(dataString string) ScriptDirective {
 		if len(markerPart) > 0 {
 			keyValue := strings.SplitN(markerPart, "=", 2)
 			key := keyValue[0]
-			value := keyValue[1]
+
+			var value string
+			if len(keyValue) > 1 {
+				value = keyValue[1]
+			}
 			directives[key] = value
 		}
 	}
@@ -31,7 +35,7 @@ func (d ScriptDirective) ShellDirective() string {
 	return d["shell"]
 }
 
-func ScriptDirectiveFromComment(comment *ast.CommentGroupNode) *ScriptDirective {
+func scriptDirectiveFromComment(comment *ast.CommentGroupNode) *ScriptDirective {
 	if marker := findScriptCheckMarker(comment); marker != nil {
 		directive := scriptDirectiveFromString(*marker)
 		return &directive

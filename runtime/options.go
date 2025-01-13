@@ -10,12 +10,14 @@ func NewOptions() *Options {
 }
 
 type Options struct {
-	Shell      string
 	OutputFile string
 
 	PipelineType reader.PipelineType
 	Debug        bool
 	Merge        bool
+
+	Strict       bool
+	DefaultShell string
 
 	ShellCheckArgs []string
 	Format         format.Format
