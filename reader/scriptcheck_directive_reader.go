@@ -74,7 +74,7 @@ func (v *scriptCheckDirectiveVisitor) Visit(node ast.Node) ast.Visitor {
 
 		if script := v.parser(v.document, nodeValue, v.anchorNodeMap); len(script) > 0 {
 			script = v.transformer(script)
-			blockName := "directive-" + name
+			blockName := "directive_" + name
 			scriptBlock := NewScriptBlock(
 				v.file.Name,
 				blockName,
