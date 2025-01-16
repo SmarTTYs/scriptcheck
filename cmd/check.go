@@ -29,6 +29,8 @@ func newCheckCommand(options *runtime.Options) *cobra.Command {
 					log.Println("There was an error checking your files...")
 					os.Exit(2)
 				}
+			} else {
+				log.Printf("Successfully checked files!")
 			}
 		},
 	}

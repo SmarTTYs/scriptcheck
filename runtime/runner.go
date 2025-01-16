@@ -1,6 +1,7 @@
 package runtime
 
 import (
+	"errors"
 	"fmt"
 	"github.com/bmatcuk/doublestar/v4"
 	"log"
@@ -16,15 +17,15 @@ func collectAndExtractScripts(options *Options, globPatterns []string) ([]reader
 		return nil, nil, err
 	}
 
+	if len(files) == 0 && options.Strict {
+		return nil, nil, errors.New("no files found")
+	}
+
 	log.Printf("Reading %s file(s)...\n", color.Color(len(files), color.Bold))
 	if scripts, err := extractScriptsFromFiles(options, files); err != nil {
 		log.Printf("Error extracting scripts: %v\n", err)
 		return nil, nil, fmt.Errorf("unable to extract files: %w", err)
 	} else {
-		if len(scripts) == 0 && options.Strict {
-			return nil, nil, fmt.Errorf("no scripts found in %s", color.Color(len(files), color.Bold))
-		}
-
 		return scripts, files, nil
 	}
 }
