@@ -134,17 +134,17 @@ func (r gitlabScriptReader) readScriptsFromJob(file, jobName string, node *ast.M
 }
 
 func replaceJobInputReference(script Script) Script {
-	scriptString := string(script)
-	for _, match := range jobInputRegex.FindAllString(scriptString, -1) {
+	transformedString := string(script)
+	for _, match := range jobInputRegex.FindAllString(transformedString, -1) {
 		replaced := strings.TrimPrefix(match, "$")
 		replaced = strings.TrimFunc(replaced, func(r rune) bool {
 			return r == '[' || r == ']' || r == ' '
 		})
 		replaced = strings.ToUpper(replaced)
-		script = Script(strings.Replace(scriptString, match, "$"+replaced, -1))
+		transformedString = strings.Replace(transformedString, match, "${"+replaced+"}", 1)
 	}
 
-	return script
+	return Script(transformedString)
 }
 
 func readLineFromNode(node ast.Node) int {
@@ -177,6 +177,8 @@ func readScriptFromNode(document *ast.DocumentNode, node ast.Node, anchorNodeMap
 	case *ast.StringNode:
 		return Script(vType.Value)
 	case *ast.LiteralNode:
+		println(vType.Value.Value)
+		println(vType.Value.GetToken().Value)
 		return Script(vType.Value.Value)
 	case *ast.SequenceNode:
 		sb := new(strings.Builder)
