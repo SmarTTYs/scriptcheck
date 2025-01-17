@@ -177,8 +177,6 @@ func readScriptFromNode(document *ast.DocumentNode, node ast.Node, anchorNodeMap
 	case *ast.StringNode:
 		return Script(vType.Value)
 	case *ast.LiteralNode:
-		println(vType.Value.Value)
-		println(vType.Value.GetToken().Value)
 		return Script(vType.Value.Value)
 	case *ast.SequenceNode:
 		sb := new(strings.Builder)
