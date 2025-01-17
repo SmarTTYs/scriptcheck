@@ -15,7 +15,7 @@ const gitlabJobIgnoreMarker = "."
 const gitlabReferenceTag = "!reference"
 
 // regular expression to find gitlab input references
-var jobInputRegex = regexp.MustCompile("\\$\\[\\[(\\s*inputs[^]]+)]]")
+var jobInputRegex = regexp.MustCompile("\\$\\[\\[(\\s*(inputs[^]]+))]]")
 
 // sections that can contain scripts
 var sections = []string{
@@ -135,13 +135,12 @@ func (r gitlabScriptReader) readScriptsFromJob(file, jobName string, node *ast.M
 
 func replaceJobInputReference(script Script) Script {
 	transformedString := string(script)
-	for _, match := range jobInputRegex.FindAllString(transformedString, -1) {
-		replaced := strings.TrimPrefix(match, "$")
-		replaced = strings.TrimFunc(replaced, func(r rune) bool {
-			return r == '[' || r == ']' || r == ' '
-		})
-		replaced = strings.ToUpper(replaced)
-		transformedString = strings.Replace(transformedString, match, "${"+replaced+"}", 1)
+	res := jobInputRegex.FindAllStringSubmatch(transformedString, -1)
+	for i := range res {
+		match := res[i][0]
+		env := strings.ToUpper(res[i][1])
+		env = "${" + strings.TrimSpace(env) + "}"
+		transformedString = strings.Replace(transformedString, match, env, 1)
 	}
 
 	return Script(transformedString)
