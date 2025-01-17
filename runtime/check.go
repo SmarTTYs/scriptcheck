@@ -21,6 +21,11 @@ func CheckFiles(options *Options, globPatterns []string) error {
 		return err
 	}
 
+	// if no scripts got found we can return directly
+	if len(scripts) == 0 {
+		return nil
+	}
+
 	log.Printf(
 		"Checking %s script(s) from %s file(s)...\n",
 		color.Color(len(scripts), color.Bold),
@@ -44,7 +49,6 @@ func checkScripts(options *Options, scripts []reader.ScriptBlock) error {
 		return err
 	}
 
-	log.Printf("Successfully checked files!")
 	return nil
 }
 
