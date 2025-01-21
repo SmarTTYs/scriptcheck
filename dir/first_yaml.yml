@@ -22,8 +22,7 @@ job_1:
       echo "after_script 3"
 
 # scriptcheck shell=bash/1
-.test-script: &example-script
-  |
+.test-script: &example-script |
   #!/bin/bash
   find . -name "*.txt.anchor" -print0 | while read -d $'\0' file
   do

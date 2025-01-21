@@ -79,22 +79,24 @@ func (v *scriptCheckDirectiveVisitor) Visit(node ast.Node) ast.Visitor {
 		name := mappingValueNode.Key.String()
 		nodeValue := mappingValueNode.Value
 
-		if script := v.parser(v.document, nodeValue, v.anchorNodeMap); len(script) > 0 {
-			script = v.transformer(script)
-			blockName := "directive_" + name
-			scriptBlock := NewScriptBlock(
-				v.file.Name,
-				blockName,
-				v.defaultShell,
-				script,
-				nodeValue,
-			)
+		if scripts := v.parser(v.document, nodeValue, v.anchorNodeMap); len(scripts) > 0 {
+			for _, script := range scripts {
+				script.script = v.transformer(script.script)
+				blockName := "directive_" + name
+				scriptBlock := NewScriptBlock(
+					v.file.Name,
+					blockName,
+					v.defaultShell,
+					script,
+					nodeValue,
+				)
 
-			if directiveShell := directive.ShellDirective(); directiveShell != "" {
-				scriptBlock.Shell = directiveShell
+				if directiveShell := directive.ShellDirective(); directiveShell != "" {
+					scriptBlock.Shell = directiveShell
+				}
+
+				v.Scripts = append(v.Scripts, scriptBlock)
 			}
-
-			v.Scripts = append(v.Scripts, scriptBlock)
 		}
 	}
 

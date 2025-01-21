@@ -32,7 +32,7 @@ func newGitlabDecoder(debug bool, defaultShell string) ScriptDecoder {
 		},
 		defaultShell: defaultShell,
 		debug:        debug,
-		parser:       readScriptFromNode,
+		parser:       readScriptBlockFromNode,
 		transformer:  replaceJobInputReference,
 	}
 
@@ -108,25 +108,25 @@ func (r gitlabScriptReader) readScriptsFromJob(file, jobName string, node *ast.M
 		eKey := element.Key.String()
 		eValue := element.Value
 		if slices.Contains(sections, eKey) {
-			script := readScriptFromNode(r.document, eValue, r.anchorNodeMap)
-			script = replaceJobInputReference(script)
-
 			blockName := jobName + "_" + eKey
-			scriptBlock := NewScriptBlock(
-				file,
-				blockName,
-				r.defaultShell,
-				script,
-				eValue,
-			)
+			for _, script := range readScriptBlockFromNode(r.document, eValue, r.anchorNodeMap) {
+				script.script = replaceJobInputReference(script.script)
+				scriptBlock := NewScriptBlock(
+					file,
+					blockName,
+					r.defaultShell,
+					script,
+					eValue,
+				)
 
-			if directive := scriptDirectiveFromComment(element.GetComment()); directive != nil {
-				if directiveShell := directive.ShellDirective(); directiveShell != "" {
-					scriptBlock.Shell = directiveShell
+				if directive := scriptDirectiveFromComment(element.GetComment()); directive != nil {
+					if directiveShell := directive.ShellDirective(); directiveShell != "" {
+						scriptBlock.Shell = directiveShell
+					}
 				}
-			}
 
-			scripts = append(scripts, scriptBlock)
+				scripts = append(scripts, scriptBlock)
+			}
 		}
 	}
 
@@ -146,46 +146,44 @@ func replaceJobInputReference(script Script) Script {
 	return Script(transformedString)
 }
 
-func readLineFromNode(node ast.Node) int {
-	switch vType := node.(type) {
-	case *ast.LiteralNode:
-		return vType.GetToken().Position.Line + 1
-	default:
-		return node.GetToken().Position.Line
-	}
-}
-
-func readScriptFromNode(document *ast.DocumentNode, node ast.Node, anchorNodeMap map[string]ast.Node) Script {
+func readScriptBlockFromNode(document *ast.DocumentNode, node ast.Node, anchorNodeMap documentAnchorMap) []scriptNode {
 	switch vType := node.(type) {
 	case *ast.TagNode:
 		if vType.Start.Value == gitlabReferenceTag {
-			return readScriptFromReference(document, vType, anchorNodeMap)
+			referencedNode := readNodeFromReference(document, vType)
+			if referencedNode != nil {
+				return readScriptBlockFromNode(document, *referencedNode, anchorNodeMap)
+			} else {
+				return nil
+			}
 		} else {
 			log.Println("Unknown reference type")
-			return ""
+			return nil
 		}
 	case *ast.AnchorNode:
-		return readScriptFromNode(document, vType.Value, anchorNodeMap)
+		return readScriptBlockFromNode(document, vType.Value, anchorNodeMap)
 	case *ast.AliasNode:
 		aliasName := vType.Value.GetToken().Value
 		if anchorValue, exists := anchorNodeMap[aliasName]; !exists {
 			panic(fmt.Sprintf("anchor %s not found!", aliasName))
 		} else {
-			return readScriptFromNode(document, anchorValue, anchorNodeMap)
+			return readScriptBlockFromNode(document, anchorValue, anchorNodeMap)
 		}
 	case *ast.StringNode:
-		return Script(vType.Value)
+		script := Script(vType.Value)
+		pos := vType.GetToken().Position.Line
+		return []scriptNode{{script, pos}}
 	case *ast.LiteralNode:
-		return Script(vType.Value.Value)
+		return readScriptBlockFromNode(document, vType.Value, anchorNodeMap)
 	case *ast.SequenceNode:
-		sb := new(strings.Builder)
+		elements := make([]scriptNode, 0)
 		for _, listElement := range vType.Values {
-			sb.WriteString(string(readScriptFromNode(document, listElement, anchorNodeMap)))
-			sb.WriteString("\n")
+			scripts := readScriptBlockFromNode(document, listElement, anchorNodeMap)
+			elements = append(elements, scripts...)
 		}
-		return Script(sb.String())
+		return elements
 	default:
-		return ""
+		return nil
 	}
 }
 
@@ -198,14 +196,10 @@ func pathFromSequence(node *ast.SequenceNode) *yaml.Path {
 	return pathBuilder.Build()
 }
 
-func readScriptFromReference(document *ast.DocumentNode, tag *ast.TagNode, anchorNodeMap map[string]ast.Node) Script {
+func readNodeFromReference(document *ast.DocumentNode, tag *ast.TagNode) *ast.Node {
 	pathValues := tag.Value.(*ast.SequenceNode)
 	pathString := pathFromSequence(pathValues)
 
-	pathNode, err := pathString.FilterNode(document.Body)
-	if err != nil {
-		return ""
-	}
-
-	return readScriptFromNode(document, pathNode, anchorNodeMap)
+	pathNode, _ := pathString.FilterNode(document.Body)
+	return &pathNode
 }
