@@ -1,8 +1,6 @@
 package format
 
 import (
-	"crypto/sha256"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"github.com/google/uuid"
@@ -27,7 +25,7 @@ type codeClimateReport struct {
 func (f *CodeQualityReportFormatter) Format(reports []report.ScriptCheckReport) (string, error) {
 	codeClimateReports := make([]codeClimateReport, 0)
 	for _, scriptReport := range reports {
-		reportLine := fmt.Sprintf("%s: %s", scriptReport.Reason, scriptReport.Message)
+		reportLine := fmt.Sprintf("%s/%s", scriptReport.Reason, scriptReport.Message)
 
 		codeClimateReport := codeClimateReport{}
 		codeClimateReport.Description = reportLine
@@ -37,11 +35,6 @@ func (f *CodeQualityReportFormatter) Format(reports []report.ScriptCheckReport) 
 		codeClimateReport.Location.Lines.Begin = scriptReport.Line
 		codeClimateReport.Severity = severityFromShellcheck(scriptReport.Level)
 
-		// todo: switch to this in order to remove duplicate reports
-		violationLine := scriptReport.Path + scriptReport.Message
-		println("Message", scriptReport.Message)
-		f.createFingerprint(violationLine)
-
 		codeClimateReports = append(codeClimateReports, codeClimateReport)
 	}
 
@@ -49,12 +42,14 @@ func (f *CodeQualityReportFormatter) Format(reports []report.ScriptCheckReport) 
 	return string(marshal), err
 }
 
+/*
 func (f *CodeQualityReportFormatter) createFingerprint(violation string) string {
 	hasher := sha256.New()
 	hasher.Write([]byte(violation))
 	sha := base64.URLEncoding.EncodeToString(hasher.Sum(nil))
 	return sha
 }
+*/
 
 func severityFromShellcheck(shellCheckSeverity string) string {
 	switch shellCheckSeverity {
