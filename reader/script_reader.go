@@ -24,8 +24,12 @@ func NewDecoder(pipelineType PipelineType, debug bool, defaultShell string) Scri
 }
 
 type documentAnchorMap map[string]ast.Node
-type scriptParser func(document *ast.DocumentNode, node ast.Node, anchorMap map[string]ast.Node) Script
-type scriptTransformer func(script Script) Script
+type scriptParser func(document *ast.DocumentNode, node ast.Node, anchorMap documentAnchorMap) []scriptNode
+
+type scriptNode struct {
+	script Script
+	line   int
+}
 
 type ScriptReader interface {
 	readScriptsForAst(file *ast.File) ([]ScriptBlock, error)
@@ -37,8 +41,7 @@ type ScriptDecoder struct {
 	defaultShell string
 	debug        bool
 
-	parser      scriptParser
-	transformer scriptTransformer
+	parser scriptParser
 }
 
 func (d ScriptDecoder) DecodeFile(file string) ([]ScriptBlock, error) {
