@@ -1,3 +1,8 @@
+.tf-var-test:
+  - First
+  - |
+    Second
+
 # some comment
 .setup:
   test: |
@@ -5,8 +10,11 @@
     With some script imported from reference
     Yeah seems to work
 
+.job_2_name: &job_2:
+  "test"
+
+
 # todo: does not work fully as expected
-job_2:
+*job_2 :
   script: !reference [.setup, test]
-  before_script: |
-    before_script
+  before_script: !reference [.tf-var-test]
