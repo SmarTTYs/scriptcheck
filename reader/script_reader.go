@@ -42,8 +42,7 @@ type ScriptDecoder struct {
 	defaultShell string
 	debug        bool
 
-	parser      scriptParser
-	transformer scriptTransformer
+	parser scriptParser
 }
 
 func (d ScriptDecoder) DecodeFile(file string) ([]ScriptBlock, error) {

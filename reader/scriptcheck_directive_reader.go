@@ -1,21 +1,19 @@
 package reader
 
 import (
+	"fmt"
 	"github.com/goccy/go-yaml/ast"
 )
 
 func newScriptCheckDirectiveDecoder(decoder ScriptDecoder) ScriptDecoder {
 	return ScriptDecoder{
 		ScriptReader: &scriptcheckDirectiveReader{
-			parser:      decoder.parser,
-			transformer: decoder.transformer,
-
+			parser:       decoder.parser,
 			defaultShell: decoder.defaultShell,
 		},
 		defaultShell: decoder.defaultShell,
 		debug:        decoder.debug,
 		parser:       decoder.parser,
-		transformer:  decoder.transformer,
 	}
 }
 
@@ -25,31 +23,25 @@ type scriptcheckDirectiveReader struct {
 
 	defaultShell string
 	parser       scriptParser
-	transformer  scriptTransformer
 }
 
 type scriptCheckDirectiveVisitor struct {
 	ast.Visitor
 	file *ast.File
 
-	defaultShell string
-
 	// currently looped document
 	document *ast.DocumentNode
 
 	Scripts []ScriptBlock
 
-	parser        scriptParser
-	transformer   scriptTransformer
+	reader        *scriptcheckDirectiveReader
 	anchorNodeMap documentAnchorMap
 }
 
-func (r *scriptcheckDirectiveReader) readScriptsForAst(file *ast.File) ([]ScriptBlock, error) {
+func (reader *scriptcheckDirectiveReader) readScriptsForAst(file *ast.File) ([]ScriptBlock, error) {
 	directiveWalker := &scriptCheckDirectiveVisitor{
 		file:          file,
-		defaultShell:  r.defaultShell,
-		parser:        r.parser,
-		transformer:   r.transformer,
+		reader:        reader,
 		anchorNodeMap: make(documentAnchorMap),
 	}
 
@@ -79,14 +71,20 @@ func (v *scriptCheckDirectiveVisitor) Visit(node ast.Node) ast.Visitor {
 		name := mappingValueNode.Key.String()
 		nodeValue := mappingValueNode.Value
 
-		if scripts := v.parser(v.document, nodeValue, v.anchorNodeMap); len(scripts) > 0 {
-			for _, script := range scripts {
-				script.script = v.transformer(script.script)
-				blockName := "directive_" + name
+		if scripts := v.reader.parser(v.document, nodeValue, v.anchorNodeMap); len(scripts) > 0 {
+			blockName := "directive_" + name
+			for i, script := range scripts {
+				var elementName string
+				if i > 0 {
+					elementName = blockName + fmt.Sprintf("_%d", i)
+				} else {
+					elementName = blockName
+				}
+
 				scriptBlock := NewScriptBlock(
 					v.file.Name,
-					blockName,
-					v.defaultShell,
+					elementName,
+					v.reader.defaultShell,
 					script,
 					nodeValue,
 				)

@@ -33,7 +33,6 @@ func newGitlabDecoder(debug bool, defaultShell string) ScriptDecoder {
 		defaultShell: defaultShell,
 		debug:        debug,
 		parser:       readScriptBlockFromNode,
-		transformer:  replaceJobInputReference,
 	}
 
 	return decoder
@@ -109,17 +108,24 @@ func (r gitlabScriptReader) readScriptsFromJob(file, jobName string, node *ast.M
 		eValue := element.Value
 		if slices.Contains(sections, eKey) {
 			blockName := jobName + "_" + eKey
-			for _, script := range readScriptBlockFromNode(r.document, eValue, r.anchorNodeMap) {
-				script.script = replaceJobInputReference(script.script)
+			directive := scriptDirectiveFromComment(element.GetComment())
+			for i, script := range readScriptBlockFromNode(r.document, eValue, r.anchorNodeMap) {
+				var elementName string
+				if i > 0 {
+					elementName = blockName + fmt.Sprintf("_%d", i)
+				} else {
+					elementName = blockName
+				}
+
 				scriptBlock := NewScriptBlock(
 					file,
-					blockName,
+					elementName,
 					r.defaultShell,
 					script,
 					eValue,
 				)
 
-				if directive := scriptDirectiveFromComment(element.GetComment()); directive != nil {
+				if directive != nil {
 					if directiveShell := directive.ShellDirective(); directiveShell != "" {
 						scriptBlock.Shell = directiveShell
 					}
@@ -131,19 +137,6 @@ func (r gitlabScriptReader) readScriptsFromJob(file, jobName string, node *ast.M
 	}
 
 	return scripts
-}
-
-func replaceJobInputReference(script Script) Script {
-	transformedString := string(script)
-	res := jobInputRegex.FindAllStringSubmatch(transformedString, -1)
-	for i := range res {
-		match := res[i][0]
-		env := strings.ToUpper(res[i][1])
-		env = "${" + strings.TrimSpace(env) + "}"
-		transformedString = strings.Replace(transformedString, match, env, 1)
-	}
-
-	return Script(transformedString)
 }
 
 func readScriptBlockFromNode(document *ast.DocumentNode, node ast.Node, anchorNodeMap documentAnchorMap) []scriptNode {
@@ -169,12 +162,6 @@ func readScriptBlockFromNode(document *ast.DocumentNode, node ast.Node, anchorNo
 		} else {
 			return readScriptBlockFromNode(document, anchorValue, anchorNodeMap)
 		}
-	case *ast.StringNode:
-		script := Script(vType.Value)
-		pos := vType.GetToken().Position.Line
-		return []scriptNode{{script, pos}}
-	case *ast.LiteralNode:
-		return readScriptBlockFromNode(document, vType.Value, anchorNodeMap)
 	case *ast.SequenceNode:
 		elements := make([]scriptNode, 0)
 		for _, listElement := range vType.Values {
@@ -182,9 +169,29 @@ func readScriptBlockFromNode(document *ast.DocumentNode, node ast.Node, anchorNo
 			elements = append(elements, scripts...)
 		}
 		return elements
+	case *ast.LiteralNode:
+		return readScriptBlockFromNode(document, vType.Value, anchorNodeMap)
+	case *ast.StringNode:
+		// transform gitlab specific input markers
+		script := replaceJobInputReference(vType.Value)
+		pos := vType.GetToken().Position.Line
+		return []scriptNode{{script, pos}}
 	default:
 		return nil
 	}
+}
+
+func replaceJobInputReference(script string) Script {
+	transformedString := script
+	res := jobInputRegex.FindAllStringSubmatch(transformedString, -1)
+	for i := range res {
+		match := res[i][0]
+		env := strings.ToUpper(res[i][1])
+		env = "${" + strings.TrimSpace(env) + "}"
+		transformedString = strings.Replace(transformedString, match, env, 1)
+	}
+
+	return Script(transformedString)
 }
 
 func pathFromSequence(node *ast.SequenceNode) *yaml.Path {
