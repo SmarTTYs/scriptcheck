@@ -32,7 +32,7 @@ func newGitlabDecoder(debug bool, defaultShell string) ScriptDecoder {
 		},
 		defaultShell: defaultShell,
 		debug:        debug,
-		parser:       readScriptBlockFromNode,
+		parser:       readScriptsFromNode,
 	}
 
 	return decoder
@@ -109,7 +109,7 @@ func (r gitlabScriptReader) readScriptsFromJob(file, jobName string, node *ast.M
 		if slices.Contains(sections, eKey) {
 			blockName := jobName + "_" + eKey
 			directive := scriptDirectiveFromComment(element.GetComment())
-			for i, script := range readScriptBlockFromNode(r.document, eValue, r.anchorNodeMap) {
+			for i, script := range readScriptsFromNode(r.document, eValue, r.anchorNodeMap) {
 				var elementName string
 				if i > 0 {
 					elementName = blockName + fmt.Sprintf("_%d", i)
@@ -139,13 +139,13 @@ func (r gitlabScriptReader) readScriptsFromJob(file, jobName string, node *ast.M
 	return scripts
 }
 
-func readScriptBlockFromNode(document *ast.DocumentNode, node ast.Node, anchorNodeMap documentAnchorMap) []scriptNode {
+func readScriptsFromNode(document *ast.DocumentNode, node ast.Node, anchorNodeMap documentAnchorMap) []scriptNode {
 	switch vType := node.(type) {
 	case *ast.TagNode:
 		if vType.Start.Value == gitlabReferenceTag {
 			referencedNode := readNodeFromReference(document, vType)
 			if referencedNode != nil {
-				return readScriptBlockFromNode(document, *referencedNode, anchorNodeMap)
+				return readScriptsFromNode(document, *referencedNode, anchorNodeMap)
 			} else {
 				return nil
 			}
@@ -154,23 +154,23 @@ func readScriptBlockFromNode(document *ast.DocumentNode, node ast.Node, anchorNo
 			return nil
 		}
 	case *ast.AnchorNode:
-		return readScriptBlockFromNode(document, vType.Value, anchorNodeMap)
+		return readScriptsFromNode(document, vType.Value, anchorNodeMap)
 	case *ast.AliasNode:
 		aliasName := vType.Value.GetToken().Value
 		if anchorValue, exists := anchorNodeMap[aliasName]; !exists {
 			panic(fmt.Sprintf("anchor %s not found!", aliasName))
 		} else {
-			return readScriptBlockFromNode(document, anchorValue, anchorNodeMap)
+			return readScriptsFromNode(document, anchorValue, anchorNodeMap)
 		}
 	case *ast.SequenceNode:
 		elements := make([]scriptNode, 0)
 		for _, listElement := range vType.Values {
-			scripts := readScriptBlockFromNode(document, listElement, anchorNodeMap)
+			scripts := readScriptsFromNode(document, listElement, anchorNodeMap)
 			elements = append(elements, scripts...)
 		}
 		return elements
 	case *ast.LiteralNode:
-		return readScriptBlockFromNode(document, vType.Value, anchorNodeMap)
+		return readScriptsFromNode(document, vType.Value, anchorNodeMap)
 	case *ast.StringNode:
 		// transform gitlab specific input markers
 		script := replaceJobInputReference(vType.Value)
