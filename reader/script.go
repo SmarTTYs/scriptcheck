@@ -56,12 +56,12 @@ func (d ScriptDirective) shellcheckString(script ScriptBlock) string {
 	directiveBuilder := new(strings.Builder)
 	directiveBuilder.WriteString("# shellcheck")
 
-	if script.HasShell() && !script.Script.hasShell() {
+	if script.HasShell() {
 		directiveBuilder.WriteString(fmt.Sprintf(" shell=%s", script.Shell))
 	}
 
 	if len(d.DisabledRules()) > 0 {
-		rulesString := strings.Join(script.directive.DisabledRules(), ",")
+		rulesString := strings.Join(d.DisabledRules(), ",")
 		directiveBuilder.WriteString(fmt.Sprintf(" disable=%s", rulesString))
 	}
 	directiveBuilder.WriteString("\n")
@@ -72,14 +72,10 @@ func (d ScriptDirective) shellcheckString(script ScriptBlock) string {
 func (script ScriptBlock) ScriptString() string {
 	builder := new(strings.Builder)
 
-	/*
-		if script.HasShell() && !script.Script.hasShell() {
-			builder.WriteString(fmt.Sprintf("# shellcheck shell=%s\n", script.Shell))
-		}
-	*/
-
 	if script.directive != nil {
 		builder.WriteString(script.directive.shellcheckString(script))
+	} else if script.Shell != "" {
+		builder.WriteString(fmt.Sprintf("# shellcheck shell=%s\n", script.Shell))
 	}
 
 	builder.WriteString(string(script.Script))
@@ -92,10 +88,6 @@ func (script ScriptBlock) HasShell() bool {
 
 func (script ScriptBlock) HasShellDirective() bool {
 	return script.directive != nil
-}
-
-func (s Script) hasShell() bool {
-	return strings.HasPrefix(string(s), "#!")
 }
 
 func (script ScriptBlock) OutputFileName() string {
