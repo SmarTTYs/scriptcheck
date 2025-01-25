@@ -16,8 +16,9 @@ type Options struct {
 	Debug        bool
 	Merge        bool
 
-	Strict       bool
-	DefaultShell string
+	Strict              bool
+	DefaultShell        string
+	ExperimentalFolding bool
 
 	ShellCheckArgs []string
 	Format         format.Format

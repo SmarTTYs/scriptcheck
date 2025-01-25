@@ -55,8 +55,12 @@ func newScriptCheckReport(reports []ShellcheckReport, scriptMap map[string]reade
 	scriptCheckReports := make([]ScriptCheckReport, 0)
 	for _, report := range reports {
 		scriptBlock := scriptMap[report.File]
+
 		var offset = 0
-		if scriptBlock.HasShell() {
+
+		// when the scriptblock defined a shell directive we need
+		// to subtract one line from the reported line
+		if scriptBlock.HasShell() || scriptBlock.HasShellDirective() {
 			offset = 1
 		}
 

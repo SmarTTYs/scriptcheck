@@ -44,6 +44,13 @@ func newRootCmd() *cobra.Command {
 		"Whether to fail when no files got found",
 	)
 
+	cmd.PersistentFlags().BoolVar(
+		&options.ExperimentalFolding,
+		"folding-transformation",
+		false,
+		"Whether to use custom folding, in order to improve position information",
+	)
+
 	typeOptions := []reader.PipelineType{reader.PipelineTypeGitlab}
 	enumVarP(
 		cmd.PersistentFlags(),

@@ -35,6 +35,15 @@ func (d ScriptDirective) ShellDirective() string {
 	return d["shell"]
 }
 
+func (d ScriptDirective) DisabledRules() []string {
+	disabled, ok := d["disable"]
+	if ok {
+		return strings.Split(disabled, ",")
+	} else {
+		return []string{}
+	}
+}
+
 func scriptDirectiveFromComment(comment *ast.CommentGroupNode) *ScriptDirective {
 	if marker := findScriptCheckMarker(comment); marker != nil {
 		directive := scriptDirectiveFromString(*marker)

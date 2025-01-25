@@ -4,10 +4,11 @@ import (
 	"fmt"
 	"github.com/goccy/go-yaml"
 	"github.com/goccy/go-yaml/ast"
-	"log"
+	"github.com/goccy/go-yaml/token"
 	"regexp"
 	"slices"
 	"strings"
+	"unicode"
 )
 
 // jobs names prefixed with a dot get ignored by gitlab ci
@@ -24,15 +25,17 @@ var sections = []string{
 	"after_script",
 }
 
-func newGitlabDecoder(debug bool, defaultShell string) ScriptDecoder {
+func newGitlabDecoder(debug bool, defaultShell string, experimentalFolding bool) ScriptDecoder {
 	decoder := ScriptDecoder{
 		ScriptReader: gitlabScriptReader{
-			defaultShell:  defaultShell,
-			anchorNodeMap: make(documentAnchorMap),
+			defaultShell:        defaultShell,
+			anchorNodeMap:       make(documentAnchorMap),
+			experimentalFolding: experimentalFolding,
 		},
-		defaultShell: defaultShell,
-		debug:        debug,
-		parser:       readScriptsFromNode,
+		defaultShell:        defaultShell,
+		debug:               debug,
+		parser:              readScriptsFromNode,
+		experimentalFolding: experimentalFolding,
 	}
 
 	return decoder
@@ -42,6 +45,8 @@ type gitlabScriptReader struct {
 	ScriptReader
 
 	defaultShell string
+
+	experimentalFolding bool
 
 	// currently looped document
 	document      *ast.DocumentNode
@@ -109,7 +114,7 @@ func (r gitlabScriptReader) readScriptsFromJob(file, jobName string, node *ast.M
 		if slices.Contains(sections, eKey) {
 			blockName := jobName + "_" + eKey
 			directive := scriptDirectiveFromComment(element.GetComment())
-			for i, script := range readScriptsFromNode(r.document, eValue, r.anchorNodeMap) {
+			for i, script := range readScriptsFromNode(r.document, eValue, r.anchorNodeMap, r.experimentalFolding) {
 				var elementName string
 				if i > 0 {
 					elementName = blockName + fmt.Sprintf("_%d", i)
@@ -123,13 +128,8 @@ func (r gitlabScriptReader) readScriptsFromJob(file, jobName string, node *ast.M
 					r.defaultShell,
 					script,
 					eValue,
+					directive,
 				)
-
-				if directive != nil {
-					if directiveShell := directive.ShellDirective(); directiveShell != "" {
-						scriptBlock.Shell = directiveShell
-					}
-				}
 
 				scripts = append(scripts, scriptBlock)
 			}
@@ -139,38 +139,56 @@ func (r gitlabScriptReader) readScriptsFromJob(file, jobName string, node *ast.M
 	return scripts
 }
 
-func readScriptsFromNode(document *ast.DocumentNode, node ast.Node, anchorNodeMap documentAnchorMap) []scriptNode {
+func readScriptsFromNode(
+	document *ast.DocumentNode,
+	node ast.Node,
+	anchorNodeMap documentAnchorMap,
+	experimentalFolding bool,
+) []scriptNode {
 	switch vType := node.(type) {
 	case *ast.TagNode:
 		if vType.Start.Value == gitlabReferenceTag {
 			referencedNode := readNodeFromReference(document, vType)
 			if referencedNode != nil {
-				return readScriptsFromNode(document, *referencedNode, anchorNodeMap)
+				return readScriptsFromNode(document, *referencedNode, anchorNodeMap, experimentalFolding)
 			} else {
 				return nil
 			}
 		} else {
-			log.Println("Unknown reference type")
 			return nil
 		}
 	case *ast.AnchorNode:
-		return readScriptsFromNode(document, vType.Value, anchorNodeMap)
+		return readScriptsFromNode(document, vType.Value, anchorNodeMap, experimentalFolding)
 	case *ast.AliasNode:
 		aliasName := vType.Value.GetToken().Value
 		if anchorValue, exists := anchorNodeMap[aliasName]; !exists {
 			panic(fmt.Sprintf("anchor %s not found!", aliasName))
 		} else {
-			return readScriptsFromNode(document, anchorValue, anchorNodeMap)
+			return readScriptsFromNode(document, anchorValue, anchorNodeMap, experimentalFolding)
 		}
 	case *ast.SequenceNode:
 		elements := make([]scriptNode, 0)
 		for _, listElement := range vType.Values {
-			scripts := readScriptsFromNode(document, listElement, anchorNodeMap)
+			scripts := readScriptsFromNode(document, listElement, anchorNodeMap, experimentalFolding)
 			elements = append(elements, scripts...)
 		}
 		return elements
+	// currently we do not directly create the script
+	// for the literals value as in this case the
+	// position (line) seems to be off. So we use the
+	// literals position and increment it by 1 as yaml
+	// expects a line break
 	case *ast.LiteralNode:
-		return readScriptsFromNode(document, vType.Value, anchorNodeMap)
+		var scriptString string
+		if vType.Start.Type == token.FoldedType && experimentalFolding {
+			origin := strings.TrimFunc(vType.Value.GetToken().Origin, unicode.IsSpace)
+			scriptString = unfoldFoldedLiteral(origin)
+		} else {
+			scriptString = vType.Value.Value
+		}
+		script := replaceJobInputReference(scriptString)
+		pos := vType.Start.Position.Line + 1
+		return []scriptNode{{script, pos}}
 	case *ast.StringNode:
 		// transform gitlab specific input markers
 		script := replaceJobInputReference(vType.Value)
@@ -179,6 +197,40 @@ func readScriptsFromNode(document *ast.DocumentNode, node ast.Node, anchorNodeMa
 	default:
 		return nil
 	}
+}
+
+func unfoldFoldedLiteral(literal string) string {
+	sb := new(strings.Builder)
+	/*
+		lineScanner := bufio.NewScanner(strings.NewReader(literal))
+		for lineScanner.Scan() {
+			println("line", lineScanner.Text())
+		}
+	*/
+	lbc := token.DetectLineBreakCharacter(literal)
+	lines := strings.Split(literal, lbc)
+	for index, element := range lines {
+		trimmed := strings.TrimLeftFunc(element, unicode.IsSpace)
+		if strings.ContainsFunc(element, isNoWhitespace) {
+			// for comments do not append a trailing slash
+			if strings.HasPrefix(trimmed, "#") {
+				sb.WriteString(trimmed + "\n")
+			} else {
+				sb.WriteString(trimmed)
+				if index != len(lines)-1 {
+					sb.WriteString(" \\\n")
+				}
+			}
+		} else {
+			sb.WriteString("\n")
+		}
+	}
+
+	return sb.String()
+}
+
+func isNoWhitespace(rune rune) bool {
+	return !unicode.IsSpace(rune)
 }
 
 func replaceJobInputReference(script string) Script {
