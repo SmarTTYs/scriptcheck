@@ -52,7 +52,7 @@ type ScriptBlock struct {
 	StartPos int
 }
 
-func (d ScriptDirective) shellcheckString(script ScriptBlock) string {
+func (d ScriptDirective) asShellcheckDirective(script ScriptBlock) string {
 	directiveBuilder := new(strings.Builder)
 	directiveBuilder.WriteString("# shellcheck")
 
@@ -73,7 +73,7 @@ func (script ScriptBlock) ScriptString() string {
 	builder := new(strings.Builder)
 
 	if script.directive != nil {
-		builder.WriteString(script.directive.shellcheckString(script))
+		builder.WriteString(script.directive.asShellcheckDirective(script))
 	} else if script.Shell != "" {
 		builder.WriteString(fmt.Sprintf("# shellcheck shell=%s\n", script.Shell))
 	}
