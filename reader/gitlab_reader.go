@@ -214,12 +214,13 @@ func unfoldFoldedLiteral(literal string) string {
 		if strings.ContainsFunc(element, isNoWhitespace) {
 			// for comments do not append a trailing slash
 			if strings.HasPrefix(trimmed, "#") {
-				sb.WriteString(trimmed + "\n")
-			} else {
 				sb.WriteString(trimmed)
-				if index != len(lines)-1 {
-					sb.WriteString(" \\\n")
-				}
+			} else {
+				sb.WriteString(trimmed + " \\")
+			}
+
+			if index != len(lines)-1 {
+				sb.WriteString("\n")
 			}
 		} else {
 			sb.WriteString("\n")
