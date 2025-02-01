@@ -16,7 +16,8 @@ const gitlabJobIgnoreMarker = "."
 const gitlabReferenceTag = "!reference"
 
 // regular expression to find gitlab input references
-var jobInputRegex = regexp.MustCompile("\\$\\[\\[(\\s*inputs[^]]+)]]")
+// ([']+.*)?(\$\[\[(\s*inputs[^]]+)]])(.*[']+)?
+var jobInputRegex = regexp.MustCompile("'?(\\$\\[\\[(\\s*inputs[^]]+)]])'?")
 
 // sections that can contain scripts
 var sections = []string{
@@ -238,13 +239,36 @@ func replaceJobInputReference(script string) Script {
 	transformedString := script
 	res := jobInputRegex.FindAllStringSubmatch(transformedString, -1)
 	for i := range res {
-		match := res[i][0]
-		env := strings.ToUpper(res[i][1])
-		env = "${" + strings.TrimSpace(env) + "}"
-		transformedString = strings.Replace(transformedString, match, env, 1)
+		subMatch := res[i]
+		match := subMatch[1]
+		inputName := subMatch[2]
+
+		var transformedInput string
+		if isSurroundedBy(subMatch[0], "'") {
+			// for single quoted inputs only unwrap the input name
+			transformedInput = strings.TrimSpace(inputName)
+		} else {
+			// for double-quoted and unquoted inputs we transform the input
+			// name to an environment variable in order to force warnings
+			// about preventing globbing and word splitting
+			// todo: consider whether we should do this kind of transformation
+			//  as we could also replace it with the input name - in case someone
+			//  wants to use inputs as environment variables he should explicitly
+			//  declare them
+			env := strings.ToUpper(inputName)
+			env = "${" + strings.TrimSpace(env) + "}"
+			transformedInput = env
+			transformedInput = strings.TrimSpace(inputName)
+		}
+
+		transformedString = strings.Replace(transformedString, match, transformedInput, 1)
 	}
 
 	return Script(transformedString)
+}
+
+func isSurroundedBy(s string, element string) bool {
+	return strings.HasPrefix(s, element) && strings.HasSuffix(s, element)
 }
 
 func pathFromSequence(node *ast.SequenceNode) *yaml.Path {
