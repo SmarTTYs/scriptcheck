@@ -8,12 +8,18 @@ import (
 	"maps"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"scriptcheck/color"
 	"scriptcheck/format"
 	"scriptcheck/reader"
 	"scriptcheck/report"
 	"slices"
 )
+
+// Possible names for a shellcheck configuration
+// that should get copied inside the temporary
+// directory containing all extracted scripts
+var shellCheckConfigNames = []string{".shellcheckrc", "shellcheckrc"}
 
 func CheckFiles(options *Options, globPatterns []string) error {
 	scripts, files, err := collectAndExtractScripts(options, globPatterns)
@@ -42,6 +48,9 @@ func checkScripts(options *Options, scripts []reader.ScriptBlock) error {
 	}
 
 	defer removeIntermediateScripts(*tempDir)
+
+	// copy shellcheck configuration files
+	copyConfigFile(*tempDir)
 
 	fileNames := slices.Collect(maps.Keys(fileScriptBlockMap))
 	err = runShellcheck(options, fileNames, fileScriptBlockMap)
@@ -117,6 +126,19 @@ func executeShellCheckCommand(scriptMap map[string]reader.ScriptBlock, options *
 	} else {
 		// nothing to do in this case
 		return nil, nil
+	}
+}
+
+func copyConfigFile(destDir string) {
+	for _, configFileName := range shellCheckConfigNames {
+		if input, err := os.ReadFile(configFileName); err != nil {
+			continue
+		} else {
+			configPath := filepath.Join(destDir, configFileName)
+			if err := os.WriteFile(configPath, input, 0644); err != nil {
+				continue
+			}
+		}
 	}
 }
 
