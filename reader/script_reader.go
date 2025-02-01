@@ -6,6 +6,7 @@ import (
 	"github.com/goccy/go-yaml/parser"
 	"log"
 	"scriptcheck/color"
+	"slices"
 )
 
 type PipelineType string
@@ -14,17 +15,22 @@ const (
 	PipelineTypeGitlab PipelineType = "gitlab"
 )
 
-func NewDecoder(pipelineType PipelineType, debug bool, defaultShell string) ScriptDecoder {
+func NewDecoder(pipelineType PipelineType, debug bool, defaultShell string, experimentalFolding bool) ScriptDecoder {
 	switch pipelineType {
 	case PipelineTypeGitlab:
-		return newGitlabDecoder(debug, defaultShell)
+		return newGitlabDecoder(debug, defaultShell, experimentalFolding)
 	}
 
 	panic(fmt.Sprintf("unknown pipeline type: %s", pipelineType))
 }
 
 type documentAnchorMap map[string]ast.Node
-type scriptParser func(document *ast.DocumentNode, node ast.Node, anchorMap documentAnchorMap) []scriptNode
+type scriptParser func(
+	document *ast.DocumentNode,
+	node ast.Node,
+	anchorMap documentAnchorMap,
+	experimentalFolding bool,
+) []scriptNode
 
 type scriptNode struct {
 	script Script
@@ -38,8 +44,9 @@ type ScriptReader interface {
 type ScriptDecoder struct {
 	ScriptReader
 
-	defaultShell string
-	debug        bool
+	experimentalFolding bool
+	defaultShell        string
+	debug               bool
 
 	parser scriptParser
 }
@@ -73,6 +80,7 @@ func (d ScriptDecoder) decodeAstFile(astFile *ast.File) ([]ScriptBlock, error) {
 
 	directiveDecoder := newScriptCheckDirectiveDecoder(d)
 	directiveScripts, err := directiveDecoder.readScriptsForAst(astFile)
+
 	if d.debug {
 		log.Printf(
 			"Extracted %s script(s) from directives for file '%s'\n",
@@ -85,8 +93,16 @@ func (d ScriptDecoder) decodeAstFile(astFile *ast.File) ([]ScriptBlock, error) {
 		return nil, err
 	}
 
-	scriptBlocks = append(scriptBlocks, directiveScripts...)
 	scriptBlocks = append(scriptBlocks, readerScripts...)
+	for _, directiveScript := range directiveScripts {
+		contains := slices.ContainsFunc(scriptBlocks, func(block ScriptBlock) bool {
+			return directiveScript.FileName == block.FileName && directiveScript.Path == block.Path
+		})
+
+		if !contains {
+			scriptBlocks = append(scriptBlocks, directiveScript)
+		}
+	}
 
 	return scriptBlocks, nil
 }

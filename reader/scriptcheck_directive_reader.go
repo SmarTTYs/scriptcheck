@@ -8,12 +8,14 @@ import (
 func newScriptCheckDirectiveDecoder(decoder ScriptDecoder) ScriptDecoder {
 	return ScriptDecoder{
 		ScriptReader: &scriptcheckDirectiveReader{
-			parser:       decoder.parser,
-			defaultShell: decoder.defaultShell,
+			parser:                decoder.parser,
+			defaultShell:          decoder.defaultShell,
+			experirementalFolding: decoder.experimentalFolding,
 		},
-		defaultShell: decoder.defaultShell,
-		debug:        decoder.debug,
-		parser:       decoder.parser,
+		defaultShell:        decoder.defaultShell,
+		debug:               decoder.debug,
+		parser:              decoder.parser,
+		experimentalFolding: decoder.experimentalFolding,
 	}
 }
 
@@ -21,8 +23,9 @@ func newScriptCheckDirectiveDecoder(decoder ScriptDecoder) ScriptDecoder {
 type scriptcheckDirectiveReader struct {
 	ScriptReader
 
-	defaultShell string
-	parser       scriptParser
+	experirementalFolding bool
+	defaultShell          string
+	parser                scriptParser
 }
 
 type scriptCheckDirectiveVisitor struct {
@@ -32,7 +35,8 @@ type scriptCheckDirectiveVisitor struct {
 	// currently looped document
 	document *ast.DocumentNode
 
-	Scripts []ScriptBlock
+	Scripts             []ScriptBlock
+	experimentalFolding bool
 
 	reader        *scriptcheckDirectiveReader
 	anchorNodeMap documentAnchorMap
@@ -71,7 +75,7 @@ func (v *scriptCheckDirectiveVisitor) Visit(node ast.Node) ast.Visitor {
 		name := mappingValueNode.Key.String()
 		nodeValue := mappingValueNode.Value
 
-		if scripts := v.reader.parser(v.document, nodeValue, v.anchorNodeMap); len(scripts) > 0 {
+		if scripts := v.reader.parser(v.document, nodeValue, v.anchorNodeMap, v.experimentalFolding); len(scripts) > 0 {
 			blockName := "directive_" + name
 			for i, script := range scripts {
 				var elementName string
@@ -87,11 +91,8 @@ func (v *scriptCheckDirectiveVisitor) Visit(node ast.Node) ast.Visitor {
 					v.reader.defaultShell,
 					script,
 					nodeValue,
+					directive,
 				)
-
-				if directiveShell := directive.ShellDirective(); directiveShell != "" {
-					scriptBlock.Shell = directiveShell
-				}
 
 				v.Scripts = append(v.Scripts, scriptBlock)
 			}

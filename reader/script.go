@@ -9,18 +9,31 @@ import (
 
 type Script string
 
-func NewScriptBlock(file, blockName, defaultShell string, script scriptNode, node ast.Node) ScriptBlock {
-	// pos := readPositionFromNode(node)
-	return ScriptBlock{
+func NewScriptBlock(
+	file, blockName, defaultShell string,
+	script scriptNode,
+	node ast.Node,
+	directive *ScriptDirective,
+) ScriptBlock {
+	block := ScriptBlock{
 		FileName:  file,
 		BlockName: blockName,
 		Script:    script.script,
 		Path:      node.GetPath(),
 		Shell:     defaultShell,
+		directive: directive,
 
 		// Column:   position.Column,
 		StartPos: script.line,
 	}
+
+	if directive != nil {
+		if directiveShell := directive.ShellDirective(); directiveShell != "" {
+			block.Shell = directiveShell
+		}
+	}
+
+	return block
 }
 
 type ScriptBlock struct {
@@ -30,6 +43,8 @@ type ScriptBlock struct {
 	Shell     string
 	Path      string
 
+	directive *ScriptDirective
+
 	// todo: currently does not work as expected
 	//  as positional information seem to be incorrect
 	//  in some cases
@@ -37,9 +52,29 @@ type ScriptBlock struct {
 	StartPos int
 }
 
+func (d ScriptDirective) asShellcheckDirective(script ScriptBlock) string {
+	directiveBuilder := new(strings.Builder)
+	directiveBuilder.WriteString("# shellcheck")
+
+	if script.HasShell() {
+		directiveBuilder.WriteString(fmt.Sprintf(" shell=%s", script.Shell))
+	}
+
+	if len(d.DisabledRules()) > 0 {
+		rulesString := strings.Join(d.DisabledRules(), ",")
+		directiveBuilder.WriteString(fmt.Sprintf(" disable=%s", rulesString))
+	}
+	directiveBuilder.WriteString("\n")
+
+	return directiveBuilder.String()
+}
+
 func (script ScriptBlock) ScriptString() string {
 	builder := new(strings.Builder)
-	if script.HasShell() && !script.Script.hasShell() {
+
+	if script.directive != nil {
+		builder.WriteString(script.directive.asShellcheckDirective(script))
+	} else if script.Shell != "" {
 		builder.WriteString(fmt.Sprintf("# shellcheck shell=%s\n", script.Shell))
 	}
 
@@ -51,8 +86,8 @@ func (script ScriptBlock) HasShell() bool {
 	return len(script.Shell) > 0
 }
 
-func (s Script) hasShell() bool {
-	return strings.HasPrefix(string(s), "#!")
+func (script ScriptBlock) HasShellDirective() bool {
+	return script.directive != nil
 }
 
 func (script ScriptBlock) OutputFileName() string {
