@@ -217,7 +217,10 @@ func unfoldFoldedLiteral(literal string) string {
 			if strings.HasPrefix(trimmed, "#") {
 				sb.WriteString(trimmed)
 			} else {
-				sb.WriteString(trimmed + " \\")
+				sb.WriteString(trimmed)
+				if index != len(lines)-1 {
+					sb.WriteString(" \\")
+				}
 			}
 
 			if index != len(lines)-1 {
