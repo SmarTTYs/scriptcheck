@@ -45,11 +45,17 @@ func newOptionsWithDefaults(pipelineType reader.PipelineType) *Options {
 }
 
 func exampleScript(script string) reader.ScriptBlock {
+	scriptNode := reader.ScriptNode{
+		Script: reader.Script(script),
+		Line:   10,
+	}
+
 	return reader.NewScriptBlock(
 		"test",
 		"key",
-		"job",
-		script,
+		"sh",
+		scriptNode,
 		ast.String(token.String("example", "org", &token.Position{})),
+		nil,
 	)
 }

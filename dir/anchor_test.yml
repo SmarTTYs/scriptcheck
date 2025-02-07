@@ -16,7 +16,7 @@
   *test
 
 *example :
-  script: "test"
+  script: *example
 
 .simple-script: &list-script
   - echo "Element 1"
