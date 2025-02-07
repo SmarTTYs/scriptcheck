@@ -13,16 +13,11 @@ type anchorWalker struct {
 func (v *anchorWalker) Visit(node ast.Node) ast.Visitor {
 	switch n := node.(type) {
 	case *ast.AliasNode:
-		if _, exists := v.aliasValueMap[n]; exists {
-			break
-		}
-
 		aliasName := n.Value.GetToken().Value
-		if node, exists := v.anchorNodeMap[aliasName]; !exists {
+		if anchorNode, exists := v.anchorNodeMap[aliasName]; !exists {
 			panic(fmt.Sprintf("could not find alias %q", aliasName))
 		} else {
-			// once the correct alias value is obtained, overwrite with that value.
-			v.aliasValueMap[n] = node
+			v.aliasValueMap[n] = anchorNode
 		}
 	case *ast.AnchorNode:
 		anchorName := n.Name.GetToken().Value

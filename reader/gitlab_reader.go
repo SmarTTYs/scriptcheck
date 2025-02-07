@@ -85,6 +85,10 @@ func (r gitlabScriptReader) readFromDocument(fileName string) ([]ScriptBlock, er
 
 func (r gitlabScriptReader) readScriptsFromMappingNode(fileName string, mappingValueNode *ast.MappingValueNode) []ScriptBlock {
 	vNode := mappingValueNode.Value
+	if vNode.Type() == ast.AnchorType {
+		vNode = vNode.(*ast.AnchorNode).Value
+	}
+
 	if vNode.Type() == ast.MappingType {
 		jobName := mappingValueNode.Key.String()
 		if strings.HasPrefix(jobName, gitlabJobIgnoreMarker) {
@@ -155,7 +159,14 @@ func readScriptsFromNode(
 			aliasName := vType.Value.GetToken().Value
 			panic(fmt.Sprintf("anchor %s not found!", aliasName))
 		} else {
-			return readScriptsFromNode(document, anchorValue, aliasValueMap, experimentalFolding)
+			// directly return alias is processed recursively
+			if anchorValue == vType {
+				script := replaceJobInputReference(vType.Value.String())
+				pos := vType.GetToken().Position.Line
+				return []ScriptNode{{script, pos}}
+			} else {
+				return readScriptsFromNode(document, anchorValue, aliasValueMap, experimentalFolding)
+			}
 		}
 	case *ast.SequenceNode:
 		elements := make([]ScriptNode, 0)
