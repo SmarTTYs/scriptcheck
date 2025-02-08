@@ -30,7 +30,6 @@ func newGitlabDecoder(debug bool, defaultShell string, experimentalFolding bool)
 	decoder := ScriptDecoder{
 		ScriptReader: gitlabScriptReader{
 			defaultShell:        defaultShell,
-			anchorNodeMap:       make(documentAnchorMap),
 			experimentalFolding: experimentalFolding,
 		},
 		defaultShell:        defaultShell,
@@ -51,24 +50,15 @@ type gitlabScriptReader struct {
 
 	// currently looped document
 	document      *ast.DocumentNode
-	anchorNodeMap documentAnchorMap
+	aliasValueMap aliasValueMap
 }
 
-func (r gitlabScriptReader) readScriptsForAst(file *ast.File) ([]ScriptBlock, error) {
+func (r gitlabScriptReader) readScriptsForAst(file *ast.File, aliasValueMap aliasValueMap) ([]ScriptBlock, error) {
+	r.aliasValueMap = aliasValueMap
 	if len(file.Docs) > 1 {
 		r.document = file.Docs[1]
 	} else {
 		r.document = file.Docs[0]
-	}
-
-	// otherwise the current filter walker fails as body
-	// will be null for empty yaml files
-	if r.document.Body != nil {
-		for _, n := range ast.Filter(ast.AnchorType, r.document) {
-			anchor := n.(*ast.AnchorNode)
-			anchorName := anchor.Name.GetToken().Value
-			r.anchorNodeMap[anchorName] = anchor.Value
-		}
 	}
 
 	// read script blocks from given document
@@ -95,6 +85,10 @@ func (r gitlabScriptReader) readFromDocument(fileName string) ([]ScriptBlock, er
 
 func (r gitlabScriptReader) readScriptsFromMappingNode(fileName string, mappingValueNode *ast.MappingValueNode) []ScriptBlock {
 	vNode := mappingValueNode.Value
+	if vNode.Type() == ast.AnchorType {
+		vNode = vNode.(*ast.AnchorNode).Value
+	}
+
 	if vNode.Type() == ast.MappingType {
 		jobName := mappingValueNode.Key.String()
 		if strings.HasPrefix(jobName, gitlabJobIgnoreMarker) {
@@ -115,7 +109,7 @@ func (r gitlabScriptReader) readScriptsFromJob(file, jobName string, node *ast.M
 		if slices.Contains(sections, eKey) {
 			blockName := jobName + "_" + eKey
 			directive := scriptDirectiveFromComment(element.GetComment())
-			for i, script := range readScriptsFromNode(r.document, eValue, r.anchorNodeMap, r.experimentalFolding) {
+			for i, script := range readScriptsFromNode(r.document, eValue, r.aliasValueMap, r.experimentalFolding) {
 				var elementName string
 				if i > 0 {
 					elementName = blockName + fmt.Sprintf("_%d", i)
@@ -143,15 +137,15 @@ func (r gitlabScriptReader) readScriptsFromJob(file, jobName string, node *ast.M
 func readScriptsFromNode(
 	document *ast.DocumentNode,
 	node ast.Node,
-	anchorNodeMap documentAnchorMap,
+	aliasValueMap aliasValueMap,
 	experimentalFolding bool,
-) []scriptNode {
+) []ScriptNode {
 	switch vType := node.(type) {
 	case *ast.TagNode:
 		if vType.Start.Value == gitlabReferenceTag {
 			referencedNode := readNodeFromReference(document, vType)
 			if referencedNode != nil {
-				return readScriptsFromNode(document, *referencedNode, anchorNodeMap, experimentalFolding)
+				return readScriptsFromNode(document, *referencedNode, aliasValueMap, experimentalFolding)
 			} else {
 				return nil
 			}
@@ -159,18 +153,25 @@ func readScriptsFromNode(
 			return nil
 		}
 	case *ast.AnchorNode:
-		return readScriptsFromNode(document, vType.Value, anchorNodeMap, experimentalFolding)
+		return readScriptsFromNode(document, vType.Value, aliasValueMap, experimentalFolding)
 	case *ast.AliasNode:
-		aliasName := vType.Value.GetToken().Value
-		if anchorValue, exists := anchorNodeMap[aliasName]; !exists {
+		if anchorValue, exists := aliasValueMap[vType]; !exists {
+			aliasName := vType.Value.GetToken().Value
 			panic(fmt.Sprintf("anchor %s not found!", aliasName))
 		} else {
-			return readScriptsFromNode(document, anchorValue, anchorNodeMap, experimentalFolding)
+			// directly return alias is processed recursively
+			if anchorValue == vType {
+				script := replaceJobInputReference(vType.Value.String())
+				pos := vType.GetToken().Position.Line
+				return []ScriptNode{{script, pos}}
+			} else {
+				return readScriptsFromNode(document, anchorValue, aliasValueMap, experimentalFolding)
+			}
 		}
 	case *ast.SequenceNode:
-		elements := make([]scriptNode, 0)
+		elements := make([]ScriptNode, 0)
 		for _, listElement := range vType.Values {
-			scripts := readScriptsFromNode(document, listElement, anchorNodeMap, experimentalFolding)
+			scripts := readScriptsFromNode(document, listElement, aliasValueMap, experimentalFolding)
 			elements = append(elements, scripts...)
 		}
 		return elements
@@ -187,14 +188,15 @@ func readScriptsFromNode(
 		} else {
 			scriptString = vType.Value.Value
 		}
+
 		script := replaceJobInputReference(scriptString)
 		pos := vType.Start.Position.Line + 1
-		return []scriptNode{{script, pos}}
+		return []ScriptNode{{script, pos}}
 	case *ast.StringNode:
 		// transform gitlab specific input markers
 		script := replaceJobInputReference(vType.Value)
 		pos := vType.GetToken().Position.Line
-		return []scriptNode{{script, pos}}
+		return []ScriptNode{{script, pos}}
 	default:
 		return nil
 	}
@@ -257,7 +259,7 @@ func replaceJobInputReference(script string) Script {
 			// todo: consider whether we should do this kind of transformation
 			//  as we could also replace it with the input name - in case someone
 			//  wants to use inputs as environment variables he should explicitly
-			//  declare them
+			//  declare them as such
 			env := strings.ToUpper(inputName)
 			env = "${" + strings.TrimSpace(env) + "}"
 			transformedInput = env

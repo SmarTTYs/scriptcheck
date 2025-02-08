@@ -24,21 +24,21 @@ func NewDecoder(pipelineType PipelineType, debug bool, defaultShell string, expe
 	panic(fmt.Sprintf("unknown pipeline type: %s", pipelineType))
 }
 
-type documentAnchorMap map[string]ast.Node
+type aliasValueMap map[*ast.AliasNode]ast.Node
 type scriptParser func(
 	document *ast.DocumentNode,
 	node ast.Node,
-	anchorMap documentAnchorMap,
+	aliasValueMap aliasValueMap,
 	experimentalFolding bool,
-) []scriptNode
+) []ScriptNode
 
-type scriptNode struct {
-	script Script
-	line   int
+type ScriptNode struct {
+	Script Script
+	Line   int
 }
 
 type ScriptReader interface {
-	readScriptsForAst(file *ast.File) ([]ScriptBlock, error)
+	readScriptsForAst(file *ast.File, aliasValueMap aliasValueMap) ([]ScriptBlock, error)
 }
 
 type ScriptDecoder struct {
@@ -69,7 +69,21 @@ func (d ScriptDecoder) MergeAndDecode(files []string) ([]ScriptBlock, error) {
 
 func (d ScriptDecoder) decodeAstFile(astFile *ast.File) ([]ScriptBlock, error) {
 	scriptBlocks := make([]ScriptBlock, 0)
-	readerScripts, err := d.readScriptsForAst(astFile)
+
+	anchorWalker := &anchorWalker{
+		anchorNodeMap: make(map[string]ast.Node),
+		aliasValueMap: make(aliasValueMap),
+	}
+
+	// otherwise the current filter walker fails as body
+	// will be null for empty yaml files
+	for _, doc := range astFile.Docs {
+		if doc.Body != nil {
+			ast.Walk(anchorWalker, doc.Body)
+		}
+	}
+
+	readerScripts, err := d.readScriptsForAst(astFile, anchorWalker.aliasValueMap)
 	if d.debug {
 		log.Printf(
 			"Extracted %s script(s) from file '%s'\n",
@@ -79,7 +93,7 @@ func (d ScriptDecoder) decodeAstFile(astFile *ast.File) ([]ScriptBlock, error) {
 	}
 
 	directiveDecoder := newScriptCheckDirectiveDecoder(d)
-	directiveScripts, err := directiveDecoder.readScriptsForAst(astFile)
+	directiveScripts, err := directiveDecoder.readScriptsForAst(astFile, anchorWalker.aliasValueMap)
 
 	if d.debug {
 		log.Printf(

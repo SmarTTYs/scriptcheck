@@ -39,24 +39,22 @@ type scriptCheckDirectiveVisitor struct {
 	experimentalFolding bool
 
 	reader        *scriptcheckDirectiveReader
-	anchorNodeMap documentAnchorMap
+	aliasValueMap aliasValueMap
 }
 
-func (reader *scriptcheckDirectiveReader) readScriptsForAst(file *ast.File) ([]ScriptBlock, error) {
+func (reader *scriptcheckDirectiveReader) readScriptsForAst(
+	file *ast.File,
+	aliasValueMap aliasValueMap,
+) ([]ScriptBlock, error) {
 	directiveWalker := &scriptCheckDirectiveVisitor{
 		file:          file,
 		reader:        reader,
-		anchorNodeMap: make(documentAnchorMap),
+		aliasValueMap: aliasValueMap,
 	}
 
 	for _, doc := range file.Docs {
 		if doc.Body != nil {
 			directiveWalker.document = doc
-			for _, n := range ast.Filter(ast.AnchorType, doc) {
-				anchor := n.(*ast.AnchorNode)
-				anchorName := anchor.Name.GetToken().Value
-				directiveWalker.anchorNodeMap[anchorName] = anchor.Value
-			}
 			ast.Walk(directiveWalker, doc)
 		}
 	}
@@ -75,7 +73,7 @@ func (v *scriptCheckDirectiveVisitor) Visit(node ast.Node) ast.Visitor {
 		name := mappingValueNode.Key.String()
 		nodeValue := mappingValueNode.Value
 
-		if scripts := v.reader.parser(v.document, nodeValue, v.anchorNodeMap, v.experimentalFolding); len(scripts) > 0 {
+		if scripts := v.reader.parser(v.document, nodeValue, v.aliasValueMap, v.experimentalFolding); len(scripts) > 0 {
 			blockName := "directive_" + name
 			for i, script := range scripts {
 				var elementName string

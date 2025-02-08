@@ -11,20 +11,20 @@ type Script string
 
 func NewScriptBlock(
 	file, blockName, defaultShell string,
-	script scriptNode,
+	script ScriptNode,
 	node ast.Node,
 	directive *ScriptDirective,
 ) ScriptBlock {
 	block := ScriptBlock{
 		FileName:  file,
 		BlockName: blockName,
-		Script:    script.script,
+		Script:    script.Script,
 		Path:      node.GetPath(),
 		Shell:     defaultShell,
 		directive: directive,
 
 		// Column:   position.Column,
-		StartPos: script.line,
+		StartPos: script.Line,
 	}
 
 	if directive != nil {
