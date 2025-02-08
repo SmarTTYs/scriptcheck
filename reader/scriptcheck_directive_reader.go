@@ -73,7 +73,7 @@ func (v *scriptCheckDirectiveVisitor) Visit(node ast.Node) ast.Visitor {
 		name := mappingValueNode.Key.String()
 		nodeValue := mappingValueNode.Value
 
-		if scripts := v.reader.parser(v.document, nodeValue, v.aliasValueMap, v.experimentalFolding); len(scripts) > 0 {
+		if scripts := v.reader.parser(v.document, nodeValue, v.aliasValueMap, v.experimentalFolding, directive); len(scripts) > 0 {
 			blockName := "directive_" + name
 			for i, script := range scripts {
 				var elementName string
@@ -89,7 +89,7 @@ func (v *scriptCheckDirectiveVisitor) Visit(node ast.Node) ast.Visitor {
 					v.reader.defaultShell,
 					script,
 					nodeValue,
-					directive,
+					script.NodeDirective,
 				)
 
 				v.Scripts = append(v.Scripts, scriptBlock)

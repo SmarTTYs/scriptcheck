@@ -44,6 +44,34 @@ func (d ScriptDirective) DisabledRules() []string {
 	}
 }
 
+func (d ScriptDirective) merge(other *ScriptDirective) *ScriptDirective {
+	if other == nil {
+		return &d
+	}
+
+	disabledRule := d.DisabledRules()
+	disabledRule = append(disabledRule, other.DisabledRules()...)
+	directive := make(ScriptDirective)
+	directive["disable"] = strings.Join(disabledRule, ",")
+	directive["shell"] = d.ShellDirective()
+
+	return &directive
+}
+
+func findSequenceElementDirective(
+	sequence *ast.SequenceNode,
+	elementIndex int,
+) *ScriptDirective {
+	var comment *ast.CommentGroupNode
+	if elementIndex == 0 {
+		comment = sequence.Comment
+	} else {
+		comment = sequence.ValueHeadComments[elementIndex]
+	}
+
+	return scriptDirectiveFromComment(comment)
+}
+
 func scriptDirectiveFromComment(comment *ast.CommentGroupNode) *ScriptDirective {
 	if marker := findScriptCheckMarker(comment); marker != nil {
 		directive := scriptDirectiveFromString(*marker)
