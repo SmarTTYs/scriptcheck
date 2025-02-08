@@ -1,6 +1,7 @@
 package reader
 
 import (
+	"fmt"
 	"github.com/goccy/go-yaml/ast"
 	"strings"
 )
@@ -42,6 +43,30 @@ func (d ScriptDirective) DisabledRules() []string {
 	} else {
 		return []string{}
 	}
+}
+
+// todo: improve empty directive handling
+func (d ScriptDirective) asShellcheckDirective(script ScriptBlock) *string {
+	if !script.HasShell() && len(d) == 0 {
+		return nil
+	}
+
+	directiveBuilder := new(strings.Builder)
+	directiveBuilder.WriteString("# shellcheck")
+
+	if script.HasShell() {
+		directiveBuilder.WriteString(fmt.Sprintf(" shell=%s", script.Shell))
+	}
+
+	if len(d.DisabledRules()) > 0 {
+		rulesString := strings.Join(d.DisabledRules(), ",")
+		directiveBuilder.WriteString(fmt.Sprintf(" disable=%s", rulesString))
+	}
+
+	directiveBuilder.WriteString("\n")
+
+	directive := directiveBuilder.String()
+	return &directive
 }
 
 func (d ScriptDirective) merge(other *ScriptDirective) *ScriptDirective {
