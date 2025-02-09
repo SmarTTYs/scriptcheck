@@ -52,28 +52,13 @@ type ScriptBlock struct {
 	StartPos int
 }
 
-func (d ScriptDirective) asShellcheckDirective(script ScriptBlock) string {
-	directiveBuilder := new(strings.Builder)
-	directiveBuilder.WriteString("# shellcheck")
-
-	if script.HasShell() {
-		directiveBuilder.WriteString(fmt.Sprintf(" shell=%s", script.Shell))
-	}
-
-	if len(d.DisabledRules()) > 0 {
-		rulesString := strings.Join(d.DisabledRules(), ",")
-		directiveBuilder.WriteString(fmt.Sprintf(" disable=%s", rulesString))
-	}
-	directiveBuilder.WriteString("\n")
-
-	return directiveBuilder.String()
-}
-
 func (script ScriptBlock) ScriptString() string {
 	builder := new(strings.Builder)
 
 	if script.directive != nil {
-		builder.WriteString(script.directive.asShellcheckDirective(script))
+		if shellcheckDirective := script.directive.asShellcheckDirective(script); shellcheckDirective != nil {
+			builder.WriteString(*shellcheckDirective)
+		}
 	} else if script.Shell != "" {
 		builder.WriteString(fmt.Sprintf("# shellcheck shell=%s\n", script.Shell))
 	}
