@@ -10,19 +10,35 @@ import (
 )
 
 func TestChecking(t *testing.T) {
-	cases := [2]struct {
+	cases := [4]struct {
 		options       *Options
 		script        reader.ScriptBlock
 		expectSuccess bool
 	}{
 		{
 			options:       newOptionsWithDefaults(reader.PipelineTypeGitlab),
-			script:        exampleScript("cd TEST"),
+			script:        exampleScript("cd TEST", nil),
 			expectSuccess: false,
 		},
 		{
 			options:       newOptionsWithDefaults(reader.PipelineTypeGitlab),
-			script:        exampleScript("cd TEST || exit 1"),
+			script:        exampleScript("cd TEST || exit 1", nil),
+			expectSuccess: true,
+		},
+		{
+			options: newOptionsWithDefaults(reader.PipelineTypeGitlab),
+			script: exampleScript(
+				"cd TEST || exit 1",
+				&reader.ScriptDirective{"shell": "bash"},
+			),
+			expectSuccess: true,
+		},
+		{
+			options: newOptionsWithDefaults(reader.PipelineTypeGitlab),
+			script: exampleScript(
+				"cd TEST || exit 1",
+				&reader.ScriptDirective{"disable": "SC12345"},
+			),
 			expectSuccess: true,
 		},
 	}
@@ -44,10 +60,11 @@ func newOptionsWithDefaults(pipelineType reader.PipelineType) *Options {
 	}
 }
 
-func exampleScript(script string) reader.ScriptBlock {
+func exampleScript(script string, nodeDirective *reader.ScriptDirective) reader.ScriptBlock {
 	scriptNode := reader.ScriptNode{
-		Script: reader.Script(script),
-		Line:   10,
+		Script:        reader.Script(script),
+		Line:          10,
+		NodeDirective: nodeDirective,
 	}
 
 	return reader.NewScriptBlock(
@@ -56,6 +73,5 @@ func exampleScript(script string) reader.ScriptBlock {
 		"sh",
 		scriptNode,
 		ast.String(token.String("example", "org", &token.Position{})),
-		nil,
 	)
 }

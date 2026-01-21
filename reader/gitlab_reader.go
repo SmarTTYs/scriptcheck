@@ -108,6 +108,7 @@ func (r gitlabScriptReader) readScriptsFromJob(file, jobName string, node *ast.M
 		eValue := element.Value
 		if slices.Contains(sections, eKey) {
 			blockName := jobName + "_" + eKey
+			println("Blockname: ", blockName)
 			directive := scriptDirectiveFromComment(element.GetComment())
 			for i, script := range readScriptsFromNode(r.document, eValue, r.aliasValueMap, r.experimentalFolding, directive) {
 				var elementName string
@@ -116,8 +117,6 @@ func (r gitlabScriptReader) readScriptsFromJob(file, jobName string, node *ast.M
 				} else {
 					elementName = blockName
 				}
-				println("Current directive", directive, strings.Join(directive.DisabledRules(), ","))
-				println("New directive", script.NodeDirective, strings.Join(script.NodeDirective.DisabledRules(), ","))
 
 				scriptBlock := NewScriptBlock(
 					file,
@@ -125,7 +124,6 @@ func (r gitlabScriptReader) readScriptsFromJob(file, jobName string, node *ast.M
 					r.defaultShell,
 					script,
 					eValue,
-					script.NodeDirective,
 				)
 
 				scripts = append(scripts, scriptBlock)
@@ -148,6 +146,7 @@ func readScriptsFromNode(
 		if vType.Start.Value == gitlabReferenceTag {
 			referencedNode := readNodeFromReference(document, vType)
 			if referencedNode != nil {
+				fmt.Println("Found... > NOTHING")
 				return readScriptsFromNode(document, *referencedNode, aliasValueMap, experimentalFolding, baseDirective)
 			} else {
 				return nil
@@ -172,15 +171,14 @@ func readScriptsFromNode(
 			}
 		}
 	case *ast.SequenceNode:
+		println("Is Sequence Node?")
 		elements := make([]ScriptNode, 0)
 		for i, listElement := range vType.Values {
 			elementDirective := baseDirective
 			if sequenceValueDirective := findSequenceElementDirective(vType, i); sequenceValueDirective != nil {
-				elementDirective = sequenceValueDirective
-				if baseDirective != nil {
-					elementDirective = baseDirective.merge(elementDirective)
-				}
+				elementDirective = merge(baseDirective, sequenceValueDirective)
 			}
+			println("Read for", listElement.Type().String())
 			scripts := readScriptsFromNode(document, listElement, aliasValueMap, experimentalFolding, elementDirective)
 			elements = append(elements, scripts...)
 		}
@@ -298,6 +296,7 @@ func pathFromSequence(node *ast.SequenceNode) *yaml.Path {
 func readNodeFromReference(document *ast.DocumentNode, tag *ast.TagNode) *ast.Node {
 	pathValues := tag.Value.(*ast.SequenceNode)
 	pathString := pathFromSequence(pathValues)
+	println("Path", pathString.String())
 
 	pathNode, _ := pathString.FilterNode(document.Body)
 	return &pathNode

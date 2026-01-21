@@ -1,7 +1,6 @@
 package reader
 
 import (
-	"fmt"
 	"github.com/goccy/go-yaml/ast"
 	"path/filepath"
 	"strings"
@@ -13,15 +12,15 @@ func NewScriptBlock(
 	file, blockName, defaultShell string,
 	script ScriptNode,
 	node ast.Node,
-	directive *ScriptDirective,
 ) ScriptBlock {
+	directive := script.NodeDirective
 	block := ScriptBlock{
 		FileName:  file,
 		BlockName: blockName,
 		Script:    script.Script,
 		Path:      node.GetPath(),
 		Shell:     defaultShell,
-		directive: directive,
+		directive: script.NodeDirective,
 
 		// Column:   position.Column,
 		StartPos: script.Line,
@@ -30,6 +29,13 @@ func NewScriptBlock(
 	if directive != nil {
 		if directiveShell := directive.ShellDirective(); directiveShell != "" {
 			block.Shell = directiveShell
+		} else {
+			shellDirective := make(ScriptDirective)
+			shellDirective["shell"] = block.Shell
+			for k, v := range *directive {
+				shellDirective[k] = v
+			}
+			block.directive = &shellDirective
 		}
 	}
 
@@ -55,12 +61,17 @@ type ScriptBlock struct {
 func (script ScriptBlock) ScriptString() string {
 	builder := new(strings.Builder)
 
-	if script.directive != nil {
-		if shellcheckDirective := script.directive.asShellcheckDirective(script); shellcheckDirective != nil {
+	directive := script.directive
+	if directive == nil && len(script.Shell) > 0 {
+		shellDirective := make(ScriptDirective)
+		shellDirective["shell"] = script.Shell
+		directive = &shellDirective
+	}
+
+	if directive != nil {
+		if shellcheckDirective := directive.asShellcheckDirective(script); shellcheckDirective != nil {
 			builder.WriteString(*shellcheckDirective)
 		}
-	} else if script.Shell != "" {
-		builder.WriteString(fmt.Sprintf("# shellcheck shell=%s\n", script.Shell))
 	}
 
 	builder.WriteString(string(script.Script))

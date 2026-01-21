@@ -10,6 +10,11 @@ const scriptCheckPrefix = "scriptcheck"
 
 type ScriptDirective map[string]string
 
+type ScriptDirectiveName struct {
+	shell         string
+	disabledRules []string
+}
+
 func scriptDirectiveFromString(dataString string) ScriptDirective {
 	data := strings.TrimPrefix(dataString, scriptCheckPrefix)
 	data = strings.TrimSpace(data)
@@ -28,6 +33,21 @@ func scriptDirectiveFromString(dataString string) ScriptDirective {
 			directives[key] = value
 		}
 	}
+
+	var disabledRules []string
+	disabled, ok := directives["disable"]
+	if ok {
+		disabledRules = strings.Split(disabled, ",")
+	} else {
+		disabledRules = []string{}
+	}
+	test := ScriptDirectiveName{
+		shell:         directives["shell"],
+		disabledRules: disabledRules,
+	}
+	println("shell", test.shell)
+	println("rules", test.disabledRules)
+	println("---")
 
 	return directives
 }
@@ -51,34 +71,49 @@ func (d ScriptDirective) asShellcheckDirective(script ScriptBlock) *string {
 		return nil
 	}
 
-	directiveBuilder := new(strings.Builder)
-	directiveBuilder.WriteString("# shellcheck")
-
-	if script.HasShell() {
-		directiveBuilder.WriteString(fmt.Sprintf(" shell=%s", script.Shell))
+	directiveBuilderNew := new(strings.Builder)
+	directiveBuilderNew.WriteString("# shellcheck")
+	for key, value := range d {
+		if len(value) > 0 {
+			directiveBuilderNew.WriteString(fmt.Sprintf(" %v=%v", key, value))
+		}
 	}
+	directiveBuilderNew.WriteString("\n")
+	println("New", directiveBuilderNew.String())
 
-	if len(d.DisabledRules()) > 0 {
-		rulesString := strings.Join(d.DisabledRules(), ",")
-		directiveBuilder.WriteString(fmt.Sprintf(" disable=%s", rulesString))
-	}
+	/*
+		directiveBuilder := new(strings.Builder)
+		directiveBuilder.WriteString("# shellcheck")
 
-	directiveBuilder.WriteString("\n")
+		if script.HasShell() {
+			directiveBuilder.WriteString(fmt.Sprintf(" shell=%s", script.Shell))
+		}
 
-	directive := directiveBuilder.String()
+		if len(d.DisabledRules()) > 0 {
+			rulesString := strings.Join(d.DisabledRules(), ",")
+			directiveBuilder.WriteString(fmt.Sprintf(" disable=%s", rulesString))
+		}
+
+		directiveBuilder.WriteString("\n")
+	*/
+	directive := directiveBuilderNew.String()
 	return &directive
 }
 
-func (d ScriptDirective) merge(other *ScriptDirective) *ScriptDirective {
-	if other == nil {
-		return &d
+func merge(base, other *ScriptDirective) *ScriptDirective {
+	if base == nil {
+		return other
 	}
 
-	disabledRule := d.DisabledRules()
+	if other == nil {
+		return base
+	}
+
+	disabledRule := base.DisabledRules()
 	disabledRule = append(disabledRule, other.DisabledRules()...)
 	directive := make(ScriptDirective)
 	directive["disable"] = strings.Join(disabledRule, ",")
-	directive["shell"] = d.ShellDirective()
+	directive["shell"] = base.ShellDirective()
 
 	return &directive
 }

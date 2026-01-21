@@ -89,7 +89,6 @@ func (v *scriptCheckDirectiveVisitor) Visit(node ast.Node) ast.Visitor {
 					v.reader.defaultShell,
 					script,
 					nodeValue,
-					script.NodeDirective,
 				)
 
 				v.Scripts = append(v.Scripts, scriptBlock)
