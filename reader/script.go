@@ -1,7 +1,6 @@
 package reader
 
 import (
-	"fmt"
 	"github.com/goccy/go-yaml/ast"
 	"path/filepath"
 	"strings"
@@ -13,15 +12,15 @@ func NewScriptBlock(
 	file, blockName, defaultShell string,
 	script ScriptNode,
 	node ast.Node,
-	directive *ScriptDirective,
 ) ScriptBlock {
+	directive := script.NodeDirective
 	block := ScriptBlock{
 		FileName:  file,
 		BlockName: blockName,
 		Script:    script.Script,
 		Path:      node.GetPath(),
 		Shell:     defaultShell,
-		directive: directive,
+		directive: script.NodeDirective,
 
 		// Column:   position.Column,
 		StartPos: script.Line,
@@ -30,6 +29,13 @@ func NewScriptBlock(
 	if directive != nil {
 		if directiveShell := directive.ShellDirective(); directiveShell != "" {
 			block.Shell = directiveShell
+		} else {
+			shellDirective := make(ScriptDirective)
+			shellDirective["shell"] = block.Shell
+			for k, v := range *directive {
+				shellDirective[k] = v
+			}
+			block.directive = &shellDirective
 		}
 	}
 
@@ -52,30 +58,20 @@ type ScriptBlock struct {
 	StartPos int
 }
 
-func (d ScriptDirective) asShellcheckDirective(script ScriptBlock) string {
-	directiveBuilder := new(strings.Builder)
-	directiveBuilder.WriteString("# shellcheck")
-
-	if script.HasShell() {
-		directiveBuilder.WriteString(fmt.Sprintf(" shell=%s", script.Shell))
-	}
-
-	if len(d.DisabledRules()) > 0 {
-		rulesString := strings.Join(d.DisabledRules(), ",")
-		directiveBuilder.WriteString(fmt.Sprintf(" disable=%s", rulesString))
-	}
-	directiveBuilder.WriteString("\n")
-
-	return directiveBuilder.String()
-}
-
 func (script ScriptBlock) ScriptString() string {
 	builder := new(strings.Builder)
 
-	if script.directive != nil {
-		builder.WriteString(script.directive.asShellcheckDirective(script))
-	} else if script.Shell != "" {
-		builder.WriteString(fmt.Sprintf("# shellcheck shell=%s\n", script.Shell))
+	directive := script.directive
+	if directive == nil && len(script.Shell) > 0 {
+		shellDirective := make(ScriptDirective)
+		shellDirective["shell"] = script.Shell
+		directive = &shellDirective
+	}
+
+	if directive != nil {
+		if shellcheckDirective := directive.asShellcheckDirective(script); shellcheckDirective != nil {
+			builder.WriteString(*shellcheckDirective)
+		}
 	}
 
 	builder.WriteString(string(script.Script))

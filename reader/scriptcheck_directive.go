@@ -1,6 +1,7 @@
 package reader
 
 import (
+	"fmt"
 	"github.com/goccy/go-yaml/ast"
 	"strings"
 )
@@ -8,6 +9,11 @@ import (
 const scriptCheckPrefix = "scriptcheck"
 
 type ScriptDirective map[string]string
+
+type ScriptDirectiveName struct {
+	shell         string
+	disabledRules []string
+}
 
 func scriptDirectiveFromString(dataString string) ScriptDirective {
 	data := strings.TrimPrefix(dataString, scriptCheckPrefix)
@@ -28,6 +34,21 @@ func scriptDirectiveFromString(dataString string) ScriptDirective {
 		}
 	}
 
+	var disabledRules []string
+	disabled, ok := directives["disable"]
+	if ok {
+		disabledRules = strings.Split(disabled, ",")
+	} else {
+		disabledRules = []string{}
+	}
+	test := ScriptDirectiveName{
+		shell:         directives["shell"],
+		disabledRules: disabledRules,
+	}
+	println("shell", test.shell)
+	println("rules", test.disabledRules)
+	println("---")
+
 	return directives
 }
 
@@ -42,6 +63,73 @@ func (d ScriptDirective) DisabledRules() []string {
 	} else {
 		return []string{}
 	}
+}
+
+// todo: improve empty directive handling
+func (d ScriptDirective) asShellcheckDirective(script ScriptBlock) *string {
+	if !script.HasShell() && len(d) == 0 {
+		return nil
+	}
+
+	directiveBuilderNew := new(strings.Builder)
+	directiveBuilderNew.WriteString("# shellcheck")
+	for key, value := range d {
+		if len(value) > 0 {
+			directiveBuilderNew.WriteString(fmt.Sprintf(" %v=%v", key, value))
+		}
+	}
+	directiveBuilderNew.WriteString("\n")
+	println("New", directiveBuilderNew.String())
+
+	/*
+		directiveBuilder := new(strings.Builder)
+		directiveBuilder.WriteString("# shellcheck")
+
+		if script.HasShell() {
+			directiveBuilder.WriteString(fmt.Sprintf(" shell=%s", script.Shell))
+		}
+
+		if len(d.DisabledRules()) > 0 {
+			rulesString := strings.Join(d.DisabledRules(), ",")
+			directiveBuilder.WriteString(fmt.Sprintf(" disable=%s", rulesString))
+		}
+
+		directiveBuilder.WriteString("\n")
+	*/
+	directive := directiveBuilderNew.String()
+	return &directive
+}
+
+func merge(base, other *ScriptDirective) *ScriptDirective {
+	if base == nil {
+		return other
+	}
+
+	if other == nil {
+		return base
+	}
+
+	disabledRule := base.DisabledRules()
+	disabledRule = append(disabledRule, other.DisabledRules()...)
+	directive := make(ScriptDirective)
+	directive["disable"] = strings.Join(disabledRule, ",")
+	directive["shell"] = base.ShellDirective()
+
+	return &directive
+}
+
+func findSequenceElementDirective(
+	sequence *ast.SequenceNode,
+	elementIndex int,
+) *ScriptDirective {
+	var comment *ast.CommentGroupNode
+	if elementIndex == 0 {
+		comment = sequence.Comment
+	} else {
+		comment = sequence.ValueHeadComments[elementIndex]
+	}
+
+	return scriptDirectiveFromComment(comment)
 }
 
 func scriptDirectiveFromComment(comment *ast.CommentGroupNode) *ScriptDirective {

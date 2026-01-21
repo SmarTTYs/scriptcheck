@@ -1,0 +1,8 @@
+inputs:
+  spec:
+---
+
+.metrics:base-test:
+  # scriptcheck shell=bash
+  test_script: |
+    echo Test

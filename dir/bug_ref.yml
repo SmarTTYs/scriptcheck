@@ -1,0 +1,5 @@
+test:
+  before_script:
+    - !reference [.metrics:base-test, test_script]
+  script:
+    - !reference [.metrics:base-test, test_script]

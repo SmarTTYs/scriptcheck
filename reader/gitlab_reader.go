@@ -108,8 +108,9 @@ func (r gitlabScriptReader) readScriptsFromJob(file, jobName string, node *ast.M
 		eValue := element.Value
 		if slices.Contains(sections, eKey) {
 			blockName := jobName + "_" + eKey
+			println("Blockname: ", blockName)
 			directive := scriptDirectiveFromComment(element.GetComment())
-			for i, script := range readScriptsFromNode(r.document, eValue, r.aliasValueMap, r.experimentalFolding) {
+			for i, script := range readScriptsFromNode(r.document, eValue, r.aliasValueMap, r.experimentalFolding, directive) {
 				var elementName string
 				if i > 0 {
 					elementName = blockName + fmt.Sprintf("_%d", i)
@@ -123,7 +124,6 @@ func (r gitlabScriptReader) readScriptsFromJob(file, jobName string, node *ast.M
 					r.defaultShell,
 					script,
 					eValue,
-					directive,
 				)
 
 				scripts = append(scripts, scriptBlock)
@@ -139,13 +139,15 @@ func readScriptsFromNode(
 	node ast.Node,
 	aliasValueMap aliasValueMap,
 	experimentalFolding bool,
+	baseDirective *ScriptDirective,
 ) []ScriptNode {
 	switch vType := node.(type) {
 	case *ast.TagNode:
 		if vType.Start.Value == gitlabReferenceTag {
 			referencedNode := readNodeFromReference(document, vType)
 			if referencedNode != nil {
-				return readScriptsFromNode(document, *referencedNode, aliasValueMap, experimentalFolding)
+				fmt.Println("Found... > NOTHING")
+				return readScriptsFromNode(document, *referencedNode, aliasValueMap, experimentalFolding, baseDirective)
 			} else {
 				return nil
 			}
@@ -153,7 +155,7 @@ func readScriptsFromNode(
 			return nil
 		}
 	case *ast.AnchorNode:
-		return readScriptsFromNode(document, vType.Value, aliasValueMap, experimentalFolding)
+		return readScriptsFromNode(document, vType.Value, aliasValueMap, experimentalFolding, baseDirective)
 	case *ast.AliasNode:
 		if anchorValue, exists := aliasValueMap[vType]; !exists {
 			aliasName := vType.Value.GetToken().Value
@@ -163,15 +165,21 @@ func readScriptsFromNode(
 			if anchorValue == vType {
 				script := replaceJobInputReference(vType.Value.String())
 				pos := vType.GetToken().Position.Line
-				return []ScriptNode{{script, pos}}
+				return []ScriptNode{{script, pos, baseDirective}}
 			} else {
-				return readScriptsFromNode(document, anchorValue, aliasValueMap, experimentalFolding)
+				return readScriptsFromNode(document, anchorValue, aliasValueMap, experimentalFolding, baseDirective)
 			}
 		}
 	case *ast.SequenceNode:
+		println("Is Sequence Node?")
 		elements := make([]ScriptNode, 0)
-		for _, listElement := range vType.Values {
-			scripts := readScriptsFromNode(document, listElement, aliasValueMap, experimentalFolding)
+		for i, listElement := range vType.Values {
+			elementDirective := baseDirective
+			if sequenceValueDirective := findSequenceElementDirective(vType, i); sequenceValueDirective != nil {
+				elementDirective = merge(baseDirective, sequenceValueDirective)
+			}
+			println("Read for", listElement.Type().String())
+			scripts := readScriptsFromNode(document, listElement, aliasValueMap, experimentalFolding, elementDirective)
 			elements = append(elements, scripts...)
 		}
 		return elements
@@ -191,12 +199,12 @@ func readScriptsFromNode(
 
 		script := replaceJobInputReference(scriptString)
 		pos := vType.Start.Position.Line + 1
-		return []ScriptNode{{script, pos}}
+		return []ScriptNode{{script, pos, baseDirective}}
 	case *ast.StringNode:
 		// transform gitlab specific input markers
 		script := replaceJobInputReference(vType.Value)
 		pos := vType.GetToken().Position.Line
-		return []ScriptNode{{script, pos}}
+		return []ScriptNode{{script, pos, baseDirective}}
 	default:
 		return nil
 	}
@@ -288,6 +296,7 @@ func pathFromSequence(node *ast.SequenceNode) *yaml.Path {
 func readNodeFromReference(document *ast.DocumentNode, tag *ast.TagNode) *ast.Node {
 	pathValues := tag.Value.(*ast.SequenceNode)
 	pathString := pathFromSequence(pathValues)
+	println("Path", pathString.String())
 
 	pathNode, _ := pathString.FilterNode(document.Body)
 	return &pathNode

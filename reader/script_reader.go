@@ -30,11 +30,14 @@ type scriptParser func(
 	node ast.Node,
 	aliasValueMap aliasValueMap,
 	experimentalFolding bool,
+	overwrittenDirective *ScriptDirective,
 ) []ScriptNode
 
 type ScriptNode struct {
 	Script Script
 	Line   int
+
+	NodeDirective *ScriptDirective
 }
 
 type ScriptReader interface {
