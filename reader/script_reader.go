@@ -122,7 +122,7 @@ func (d ScriptDecoder) decodeAstFile(astFile *ast.File) ([]ScriptBlock, error) {
 }
 
 func readFile(file string) (*ast.File, error) {
-	astFile, err := parser.ParseFile(file, parser.ParseComments)
+	astFile, err := parser.ParseFile(file, parser.ParseComments, parser.AllowDuplicateMapKey())
 	if err != nil {
 		return nil, fmt.Errorf("unable to parse file %s: %w", file, err)
 	}

@@ -1,0 +1,15 @@
+.names:
+  plan: &plan_name "test"
+  build: &build_name "build"
+
+*plan_name :
+  script:
+    echo "Plan"
+
+*build_name :
+  script:
+    echo "Build"
+
+test:
+  script:
+    echo "Build"
