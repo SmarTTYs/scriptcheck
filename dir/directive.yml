@@ -8,6 +8,7 @@ literal_test:
     done
     
     echo $[[ inputs.test ]]
+    component $[[ component.metadata ]]
 
 illegal_test:
   # scriptcheck

@@ -17,7 +17,7 @@ const gitlabReferenceTag = "!reference"
 
 // regular expression to find gitlab input references
 // ([']+.*)?(\$\[\[(\s*inputs[^]]+)]])(.*[']+)?
-var jobInputRegex = regexp.MustCompile("'?(\\$\\[\\[(\\s*inputs[^]]+)]])'?")
+var jobInputRegex = regexp.MustCompile("'?(\\$\\[\\[(\\s*(inputs|component)[^]]+)]])'?")
 
 // sections that can contain scripts
 var sections = []string{
